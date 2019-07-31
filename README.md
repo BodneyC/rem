@@ -11,11 +11,16 @@ At runtime, the contents of this location are taken and decoded and a list of th
 
 ## Usage
 
-There are four subcommands (so `rem <subcom>`):
+There are five subcommands (so `rem <subcom>`):
 
 - `remove`: Moves the given file to the storage location
-- `delete`: Which deletes files in the stoage location
+- `delete`: Which deletes files in the storage location
 - `restore`: which restores files from the storage location
+- `search`: List files in the storage location matching a `grep` pattern
+
+`search` can be useful when `delete`ing to save writing full paths, eg:
+
+    $ rem dl $(rem sr "myfile")
 
 Nothing more to it really.
 
@@ -24,7 +29,7 @@ Nothing more to it really.
 ```
 Rem usage:
  
-    rem [(--help|--version)] (remove|restore|clean) [<args>]
+    rem [(--help|--version)] (remove|restore|clean|search) [<args>]
  
   remove:
     aliases: rm, rem, remove
@@ -34,9 +39,9 @@ Rem usage:
     aliases: rs, res, restore
     desc:    restore file(s) from $STORE_DIR (args either with or with $STORE_DIR prefix)
  
-  list:
-    aliases: ls, lis, list
-    desc:    list files added to $LIST_FILE
+  search:
+    aliases: sr, sear, search
+    desc:    search files added to \$STORE_DIR, grep expressions as optional args
  
   clean:
     aliases: cl, cln, clean

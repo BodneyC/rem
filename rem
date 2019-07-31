@@ -125,11 +125,22 @@ func_remove() {
 	done
 }
 
-func_list() {
-	echo "$LIST"
+func_search() {
+	if [[ -z "$1" ]]; then
+		echo "$LIST"
+		return
+	fi
+	RES=""
+	for t in "$@"; do
+		T=$(${B["grep"]} "$t" <<< "$LIST")
+		! ${B["grep"]} "$T" <<< "$RES" \
+			&& RES+=("$T")
+	done
+	echo "$T"
 }
 
 func_clean() {
+	! _yes_or_no "Are you sure" && _exit_msg "Clean aborted" $EPROG
 	rm -r "$STORE_DIR" || _exit_msg "Could not remove $STORE_DIR" $EPROG
 	mkdir -p "$STORE_DIR"
 }
@@ -137,7 +148,7 @@ func_clean() {
 ################## MISC ##################
  
 func_help() {
-    echo "rem [(--help|--version)] (remove|restore|clean) [<args>]"
+    echo "rem [(--help|--version)] (remove|restore|clean|search) [<args>]"
 }
  
 func_HELP() {
@@ -145,7 +156,7 @@ func_HELP() {
        
 Rem usage:
  
-    rem [(--help|--version)] (remove|restore|clean) [<args>]
+    rem [(--help|--version)] (remove|restore|clean|search) [<args>]
  
   remove:
     aliases: rm, rem, remove
@@ -155,9 +166,9 @@ Rem usage:
     aliases: rs, res, restore
     desc:    restore file(s) from \$STORE_DIR (args either with or with \$STORE_DIR prefix)
  
-  list:
-    aliases: ls, lis, list
-    desc:    list files added to \$LIST_FILE
+  search:
+    aliases: sr, sear, search
+    desc:    search files added to \$STORE_DIR, grep expressions as optional args
  
   clean:
     aliases: cl, cln, clean
@@ -220,7 +231,7 @@ main() {
 			r?(e)m?(ove))  [[ -z "$cmd" ]] && cmd="remove"  || argv+=("$1") ;;
 			r?(e)s?(tore)) [[ -z "$cmd" ]] && cmd="restore" || argv+=("$1") ;;
 			cl?(ea)?(n))   [[ -z "$cmd" ]] && cmd="clean"   || argv+=("$1") ;;
-			l?(i)s?(t))    [[ -z "$cmd" ]] && cmd="list"    || argv+=("$1") ;;
+			s?(ea)r?(ch))  [[ -z "$cmd" ]] && cmd="search"  || argv+=("$1") ;;
 			*)             [[ -z "$cmd" ]] && cmd="$1"; argv+=("$1") ;;
 		esac
 		shift
