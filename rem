@@ -1,0 +1,234 @@
+#!/bin/bash
+ 
+#shellcheck disable=SC2230,SC2078,SC2050
+ 
+shopt -s extglob
+
+EPROG=1; EOPTN=2; EFILE=3; EUSAG=4;
+
+declare STORE_DIR LIST
+declare -A B # BINARIES
+
+################## INIT ##################
+ 
+_init__runtime_vars() {
+	if [[ -z "$STORE_DIR" ]]; then
+		STORE_DIR="$HOME/.recycle"
+		mkdir -p "$STORE_DIR"
+	else
+		STORE_DIR="$(realpath "$STORE_DIR")"
+		[[ ! -d "$STORE_DIR" ]] && _exit_msg "STORE_DIR: $STORE_DIR does not exist" $EFILE
+	fi
+	LIST=$(_init__decode_list)
+}
+
+_init__validate_software() {
+	for s in "$@"; do
+		hash "$s" || _exit_msg "\"$s\" not found on \$PATH, exiting..." $EPROG
+		B["$s"]="$(which "$s")"
+	done
+}
+ 
+_init__decode_list() {
+	for f in "$STORE_DIR"/*; do
+		[[ -f "$f" ]] || continue
+		${B["base64"]} --decode <<< "$(basename "$f")"
+	done
+}
+
+################## LIB ###################
+ 
+_exit_msg() {
+	echo -e "$1"; exit "$2"
+}
+ 
+_sig_recv() {
+	_exit_msg "Signal recieved, exiting..." $EPROG
+}
+ 
+_check_dir_exists() {
+	if [[ ! -d "$1" ]]; then
+		echo "$1 not found, creating..."
+		mkdir -p "$1"
+	fi
+}
+ 
+_check_file_exists() {
+	if [[ ! -f "$1" ]]; then
+		echo "$1 not found, touching..."
+		touch "$1"
+	fi
+}
+ 
+_yes_or_no() {
+	while [[ 1 == 1 ]]; do
+		read -rp "$1 [yn] "
+		case "$REPLY" in
+			[yY]*) return 0 ;;
+			[nN]*) return 1 ;;
+			*)     echo "Invalid option"
+		esac
+	done
+}
+ 
+################## LIST ##################
+ 
+_check_in_list() {
+	${B["grep"]} -q -e "^$(realpath "$1")$" <<< "$LIST"
+}
+ 
+_remove_from_list() {
+	LIST=$(${B["grep"]} -v -e "^$1$" <<< "$LIST")
+}
+ 
+_add_to_list() {
+	! _check_in_list "$1" && LIST="$LIST\n$(realpath "$1")"
+}
+ 
+_b64_filename() {
+	${B["base64"]} <<< "$(realpath "$1")"
+}
+ 
+################## CORE ##################
+
+func_restore() {
+	for f in "$@"; do
+		f=${f#"$STORE_DIR"}
+		if ! _check_in_list "$f"; then
+			echo "$f not found in $STORE_DIR, continuing..."
+			continue
+		fi
+		_remove_from_list "$f"
+		mv "$STORE_DIR/$(_b64_filename "$f")" "$f"
+	done
+}
+
+func_delete() {
+	for f in "$@"; do
+		f=${f#"$STORE_DIR"}
+		if ! _check_in_list "$f"; then
+			echo "$f not found in $STORE_DIR, continuing..."
+			continue
+		fi
+		rm "$STORE_DIR/$(_b64_filename "$f")"
+	done
+}
+
+func_remove() {
+	for f in "$@"; do
+		if [[ "$f" == "$STORE_DIR"* ]]; then
+			echo "Cannot remove file already in $STORE_DIR, continuing..."
+			continue
+		fi
+		_add_to_list "$f"
+		mv "$f" "$STORE_DIR/$(_b64_filename "$f")"
+	done
+}
+
+func_list() {
+	echo "$LIST"
+}
+
+func_clean() {
+	rm -r "$STORE_DIR" || _exit_msg "Could not remove $STORE_DIR" $EPROG
+	mkdir -p "$STORE_DIR"
+}
+ 
+################## MISC ##################
+ 
+func_help() {
+    echo "rem [(--help|--version)] (remove|restore|clean) [<args>]"
+}
+ 
+func_HELP() {
+	cat << EOF >> /dev/stdout
+       
+Rem usage:
+ 
+    rem [(--help|--version)] (remove|restore|clean) [<args>]
+ 
+  remove:
+    aliases: rm, rem, remove
+    desc:    moves specified file(s) to \$STORE_DIR
+       
+  restore:
+    aliases: rs, res, restore
+    desc:    restore file(s) from \$STORE_DIR (args either with or with \$STORE_DIR prefix)
+ 
+  list:
+    aliases: ls, lis, list
+    desc:    list files added to \$LIST_FILE
+ 
+  clean:
+    aliases: cl, cln, clean
+    desc:    empty \$STORE_DIR, you will be prompted for assurance
+ 
+EOF
+}
+ 
+func_version() {
+	echo "Rem: 0.0.1"
+}
+
+func_VERSION() {
+	cat << EOF >> /dev/stdout
+rem: recycle bin, quick and simple
+ 
+Copyright © 2019 Benjamin Carrington
+ 
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+ 
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+ 
+You should have received a copy of the GNU General Public License
+along with this program; if not, see <http://www.gnu.org/licenses/>.
+ 
+Version: 0.0.1
+EOF
+}
+
+################## MAIN ##################
+ 
+main() {
+	trap _sig_recv SIGINT
+ 
+	_init__validate_software "grep" "base64"
+	_init__runtime_vars
+ 
+	argv=()
+	cmd=""
+	[[ $# == 0 ]] && cmd="help"
+	while [[ -n "$1" ]]; do
+		case "$1" in
+			--) ;;
+			-*) case "$1" in
+					-h)           [[ -z "$cmd" ]] && cmd="help"    || argv+=("$1") ;;
+					-H|--help)    [[ -z "$cmd" ]] && cmd="HELP"    || argv+=("$1") ;;
+					-v)           [[ -z "$cmd" ]] && cmd="version" || argv+=("$1") ;;
+					-V|--version) [[ -z "$cmd" ]] && cmd="VERSION" || argv+=("$1") ;;
+					*)            [[ -z "$cmd" ]] \
+					                  && _exit_msg "Unknown option: $1" $EOPTN \
+					                  || argv+=("$1")
+				esac ;;
+			d?(e)l?(ete))  [[ -z "$cmd" ]] && cmd="delete"  || argv+=("$1") ;;
+			r?(e)m?(ove))  [[ -z "$cmd" ]] && cmd="remove"  || argv+=("$1") ;;
+			r?(e)s?(tore)) [[ -z "$cmd" ]] && cmd="restore" || argv+=("$1") ;;
+			cl?(ea)?(n))   [[ -z "$cmd" ]] && cmd="clean"   || argv+=("$1") ;;
+			l?(i)s?(t))    [[ -z "$cmd" ]] && cmd="list"    || argv+=("$1") ;;
+			*)             [[ -z "$cmd" ]] && cmd="$1"; argv+=("$1") ;;
+		esac
+		shift
+	done
+
+	! type "func_$cmd" &>/dev/null && _exit_msg "Command \"$cmd\" not found" $EUSAG
+	"func_$cmd" "${argv[@]}"
+}
+
+main "$@"
+exit $?
