@@ -148,7 +148,7 @@ func_clean() {
 ################## MISC ##################
  
 func_help() {
-    echo "rem [(--help|--version)] (remove|restore|clean|search) [<args>]"
+    echo "rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]"
 }
  
 func_HELP() {
@@ -156,7 +156,7 @@ func_HELP() {
        
 Rem usage:
  
-    rem [(--help|--version)] (remove|restore|clean|search) [<args>]
+    rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]
  
   remove:
     aliases: rm, rem, remove
@@ -166,6 +166,10 @@ Rem usage:
     aliases: rs, res, restore
     desc:    restore file(s) from \$STORE_DIR (args either with or with \$STORE_DIR prefix)
  
+  delete:
+    alias:   dl, del, delte
+    desc:    delete files from $STORE_DIR
+
   search:
     aliases: sr, sear, search
     desc:    search files added to \$STORE_DIR, grep expressions as optional args
