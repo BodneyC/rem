@@ -11,7 +11,7 @@ At runtime, the contents of this location are taken and decoded and a list of th
 
 ## Usage
 
-There are five subcommands (so `rem <subcom>`):
+There are four subcommands (so `rem <subcom>`):
 
 - `remove`: Moves the given file to the storage location
 - `delete`: Which deletes files in the storage location
