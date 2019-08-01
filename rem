@@ -4,7 +4,7 @@
  
 shopt -s extglob
 
-EPROG=1; EOPTN=2; EFILE=3; EUSAG=4;
+EPROG=1; EOPTN=2; EFILE=3; EARGS=4;
 
 declare STORE_DIR LIST
 declare -A B # BINARIES
@@ -24,7 +24,7 @@ _init__runtime_vars() {
 
 _init__validate_software() {
 	for s in "$@"; do
-		hash "$s" || _exit_msg "\"$s\" not found on \$PATH, exiting..." $EPROG
+		hash "$s" || _exit_msg "\"$s\" not found on \$PATH" $EPROG
 		B["$s"]="$(which "$s")"
 	done
 }
@@ -39,11 +39,11 @@ _init__decode_list() {
 ################## LIB ###################
  
 _exit_msg() {
-	echo -e "$1"; exit "$2"
+	echo -e "$1, exiting..."; exit "$2"
 }
  
 _sig_recv() {
-	_exit_msg "Signal recieved, exiting..." $EPROG
+	_exit_msg "Signal recieved" $EPROG
 }
  
 _check_dir_exists() {
@@ -70,6 +70,13 @@ _yes_or_no() {
 		esac
 	done
 }
+
+_core_no_args() {
+	if [[ $# -eq 0 ]]; then
+		func_help
+		exit $EARGS
+	fi
+}
  
 ################## LIST ##################
  
@@ -92,6 +99,7 @@ _b64_filename() {
 ################## CORE ##################
 
 func_restore() {
+	_core_no_args "$@"
 	for f in "$@"; do
 		f=${f#"$STORE_DIR"}
 		if ! _check_in_list "$f"; then
@@ -104,17 +112,20 @@ func_restore() {
 }
 
 func_delete() {
+	_core_no_args "$@"
 	for f in "$@"; do
 		f=${f#"$STORE_DIR"}
 		if ! _check_in_list "$f"; then
 			echo "$f not found in $STORE_DIR, continuing..."
 			continue
 		fi
+		_remove_from_list "$f"
 		${B["rm"]} "$STORE_DIR/$(_b64_filename "$f")"
 	done
 }
 
 func_remove() {
+	_core_no_args "$@"
 	for f in "$@"; do
 		if [[ "$f" == "$STORE_DIR"* ]]; then
 			echo "Cannot remove file already in $STORE_DIR, continuing..."
@@ -241,7 +252,7 @@ main() {
 		shift
 	done
 
-	! type "func_$cmd" &>/dev/null && _exit_msg "Command \"$cmd\" not found" $EUSAG
+	! type "func_$cmd" &>/dev/null && _exit_msg "Command \"$cmd\" not found" $EARGS
 	"func_$cmd" "${argv[@]}"
 }
 
