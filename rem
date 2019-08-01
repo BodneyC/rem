@@ -110,7 +110,7 @@ func_delete() {
 			echo "$f not found in $STORE_DIR, continuing..."
 			continue
 		fi
-		rm "$STORE_DIR/$(_b64_filename "$f")"
+		${B["rm"]} "$STORE_DIR/$(_b64_filename "$f")"
 	done
 }
 
@@ -141,7 +141,7 @@ func_search() {
 
 func_clean() {
 	! _yes_or_no "Are you sure" && _exit_msg "Clean aborted" $EPROG
-	rm -r "$STORE_DIR" || _exit_msg "Could not remove $STORE_DIR" $EPROG
+	${B["rm"]} -r "$STORE_DIR" || _exit_msg "Could not remove $STORE_DIR" $EPROG
 	mkdir -p "$STORE_DIR"
 }
  
@@ -213,7 +213,7 @@ EOF
 main() {
 	trap _sig_recv SIGINT
  
-	_init__validate_software "grep" "base64"
+	_init__validate_software "grep" "base64" "rm"
 	_init__runtime_vars
  
 	argv=()
