@@ -31,7 +31,7 @@ _init__validate_software() {
  
 _init__decode_list() {
 	for f in "$STORE_DIR"/*; do
-		[[ -f "$f" ]] || continue
+		[[ -f "$f" || -d "$f" ]] || continue
 		${B["base64"]} --decode <<< "$(basename "$f")"
 	done
 }
