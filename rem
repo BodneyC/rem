@@ -148,7 +148,7 @@ func_search() {
 	fi
 	RES=""
 	for t in "$@"; do
-		T=$(${B["grep"]} "$t" <<< "$LIST")
+		T=$(${B["grep"]} -e "$t" <<< "$LIST")
 		! ${B["grep"]} "$T" <<< "$RES" \
 			&& RES+=("$T")
 	done
