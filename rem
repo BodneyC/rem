@@ -127,12 +127,17 @@ func_delete() {
 func_remove() {
 	_core_no_args "$@"
 	for f in "$@"; do
+		[[ -z "$f" ]] && continue
 		if [[ "$f" == "$STORE_DIR"* ]]; then
 			echo "Cannot remove file already in $STORE_DIR, continuing..."
 			continue
 		fi
-		_add_to_list "$f"
-		mv "$f" "$STORE_DIR/$(_b64_filename "$f")"
+		if [[ -f "$f" || -d "$f" ]]; then
+			_add_to_list "$f"
+			mv "$f" "$STORE_DIR/$(_b64_filename "$f")"
+		else
+			echo "File $f does not exist, continuing..."
+		fi
 	done
 }
 
@@ -221,6 +226,10 @@ EOF
 
 ################## MAIN ##################
  
+_done_check() {
+	[[ -z "$1" && -z "$2" ]] && echo 1
+}
+
 main() {
 	trap _sig_recv SIGINT
  
@@ -229,32 +238,37 @@ main() {
  
 	argv=()
 	cmd=""
+	arg_end=""
 	[[ $# == 0 ]] && cmd="help"
 	while [[ -n "$1" ]]; do
+		CHECK=$(_done_check "$cmd" "$arg_end")
 		case "$1" in
-			--) ;;
+			--) arg_end=1 ;;
 			-*) case "$1" in
-					-h)           [[ -z "$cmd" ]] && cmd="help"    || argv+=("$1") ;;
-					-H|--help)    [[ -z "$cmd" ]] && cmd="HELP"    || argv+=("$1") ;;
-					-v)           [[ -z "$cmd" ]] && cmd="version" || argv+=("$1") ;;
-					-V|--version) [[ -z "$cmd" ]] && cmd="VERSION" || argv+=("$1") ;;
-					*)            [[ -z "$cmd" ]] \
+					-h)           [[ -n "$CHECK" ]] && cmd="help"    || argv+=("$1") ;;
+					-H|--help)    [[ -n "$CHECK" ]] && cmd="HELP"    || argv+=("$1") ;;
+					-v)           [[ -n "$CHECK" ]] && cmd="version" || argv+=("$1") ;;
+					-V|--version) [[ -n "$CHECK" ]] && cmd="VERSION" || argv+=("$1") ;;
+					*)            [[ -n "$CHECK" ]] \
 					                  && _exit_msg "Unknown option: $1" $EOPTN \
 					                  || argv+=("$1")
 				esac ;;
-			d?(e)l?(ete))  [[ -z "$cmd" ]] && cmd="delete"  || argv+=("$1") ;;
-			r?(e)m?(ove))  [[ -z "$cmd" ]] && cmd="remove"  || argv+=("$1") ;;
-			r?(e)s?(tore)) [[ -z "$cmd" ]] && cmd="restore" || argv+=("$1") ;;
-			cl?(ea)?(n))   [[ -z "$cmd" ]] && cmd="clean"   || argv+=("$1") ;;
-			s?(ea)r?(ch))  [[ -z "$cmd" ]] && cmd="search"  || argv+=("$1") ;;
-			*)             [[ -z "$cmd" ]] && cmd="$1"; argv+=("$1") ;;
+			d?(e)l?(ete))  [[ -n "$CHECK" ]] && cmd="delete"  || argv+=("$1") ;;
+			r?(e)m?(ove))  [[ -n "$CHECK" ]] && cmd="remove"  || argv+=("$1") ;;
+			r?(e)s?(tore)) [[ -n "$CHECK" ]] && cmd="restore" || argv+=("$1") ;;
+			cl?(ea)?(n))   [[ -n "$CHECK" ]] && cmd="clean"   || argv+=("$1") ;;
+			s?(ea)r?(ch))  [[ -n "$CHECK" ]] && cmd="search"  || argv+=("$1") ;;
+			*)             argv+=("$1") ;;
 		esac
 		shift
 	done
 
-	! type "func_$cmd" &>/dev/null && _exit_msg "Command \"$cmd\" not found" $EARGS
+	if ! type "func_$cmd" >& /dev/null; then
+		argv+=("$cmd")
+		cmd="remove"
+	fi
+
 	"func_$cmd" "${argv[@]}"
 }
 
 main "$@"
-exit $?
