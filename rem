@@ -120,7 +120,7 @@ func_delete() {
 			continue
 		fi
 		_remove_from_list "$f"
-		${B["rm"]} "$STORE_DIR/$(_b64_filename "$f")"
+		${B["rm"]} -rf "$STORE_DIR/$(_b64_filename "$f")"
 	done
 }
 
