@@ -134,7 +134,9 @@ func_remove() {
 		fi
 		if [[ -f "$f" || -d "$f" ]]; then
 			_add_to_list "$f"
-			mv "$f" "$STORE_DIR/$(_b64_filename "$f")"
+			TO_FILE="$STORE_DIR/$(_b64_filename "$f")"
+			[[ -d "$f" ]] && ${B["rm"]} -rf "$TO_FILE"
+			mv "$f" "$TO_FILE"
 		else
 			echo "File $f does not exist, continuing..."
 		fi
