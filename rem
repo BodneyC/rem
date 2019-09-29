@@ -132,7 +132,7 @@ func_remove() {
 			echo "Cannot remove file already in $STORE_DIR, continuing..."
 			continue
 		fi
-		if [[ -f "$f" || -d "$f" ]]; then
+		if [[ -f "$f" || -d "$f" || -L "$f" ]]; then
 			_add_to_list "$f"
 			TO_FILE="$STORE_DIR/$(_b64_filename "$f")"
 			[[ -d "$f" ]] && ${B["rm"]} -rf "$TO_FILE"
@@ -159,7 +159,7 @@ func_search() {
 
 func_clean() {
 	! _yes_or_no "Are you sure" && _exit_msg "Clean aborted" $EPROG
-	${B["rm"]} -r "$STORE_DIR" || _exit_msg "Could not remove $STORE_DIR" $EPROG
+	${B["rm"]} -rf "$STORE_DIR" || _exit_msg "Could not remove $STORE_DIR" $EPROG
 	mkdir -p "$STORE_DIR"
 }
  
