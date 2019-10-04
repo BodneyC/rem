@@ -1,16 +1,18 @@
 #!/bin/bash
- 
+
 #shellcheck disable=SC2230,SC2078,SC2050
- 
+
 shopt -s extglob
 
 EPROG=1; EOPTN=2; EFILE=3; EARGS=4;
 
-declare STORE_DIR LIST
+declare STORE_DIR
 declare -A B # BINARIES
 
+LIST_FILE="$(mktemp)"
+
 ################## INIT ##################
- 
+
 _init__runtime_vars() {
 	if [[ -z "$STORE_DIR" ]]; then
 		STORE_DIR="$HOME/.recycle"
@@ -19,7 +21,6 @@ _init__runtime_vars() {
 		STORE_DIR="$(realpath "$STORE_DIR")"
 		[[ ! -d "$STORE_DIR" ]] && _exit_msg "STORE_DIR: $STORE_DIR does not exist" $EFILE
 	fi
-	LIST=$(_init__decode_list)
 }
 
 _init__validate_software() {
@@ -28,38 +29,39 @@ _init__validate_software() {
 		B["$s"]="$(which "$s")"
 	done
 }
- 
+
 _init__decode_list() {
 	for f in "$STORE_DIR"/*; do
-		[[ -f "$f" || -d "$f" ]] || continue
-		${B["base64"]} --decode <<< "$(basename "$f")"
+		! [[ -e "$f" ]] && continue
+		${B["base64"]} --decode <<< "$(basename "$f")" >> "$LIST_FILE"
 	done
+	[[ "$(wc -c "$LIST_FILE")" == 0 ]] && echo "Empty" >> "$LIST_FILE"
 }
 
 ################## LIB ###################
- 
+
 _exit_msg() {
 	echo -e "$1, exiting..."; exit "$2"
 }
- 
+
 _sig_recv() {
 	_exit_msg "Signal recieved" $EPROG
 }
- 
+
 _check_dir_exists() {
 	if [[ ! -d "$1" ]]; then
 		echo "$1 not found, creating..."
 		mkdir -p "$1"
 	fi
 }
- 
+
 _check_file_exists() {
 	if [[ ! -f "$1" ]]; then
 		echo "$1 not found, touching..."
 		touch "$1"
 	fi
 }
- 
+
 _yes_or_no() {
 	while [[ 1 == 1 ]]; do
 		read -rp "$1 [yn] "
@@ -77,25 +79,27 @@ _core_no_args() {
 		exit $EARGS
 	fi
 }
- 
+
 ################## LIST ##################
- 
+
 _check_in_list() {
-	${B["grep"]} -q -e "^$(realpath "$1")$" <<< "$LIST"
+	${B["grep"]} -q -e "^$(realpath "$1")$" "$LIST_FILE"
 }
- 
+
 _remove_from_list() {
-	LIST=$(${B["grep"]} -v -e "^$1$" <<< "$LIST")
+	TMP_FILE="$(mktemp)"
+	${B["grep"]} -v -e "^$1$" "$LIST_FILE" > "$TMP_FILE"
+	mv "$TMP_FILE" "$LIST_FILE"
 }
- 
+
 _add_to_list() {
-	! _check_in_list "$1" && LIST="$LIST\n$(realpath "$1")"
+	! _check_in_list "$1" && realpath "$1" >> "$LIST_FILE"
 }
- 
+
 _b64_filename() {
 	${B["base64"]} <<< "$(realpath "$1")"
 }
- 
+
 ################## CORE ##################
 
 func_restore() {
@@ -145,12 +149,12 @@ func_remove() {
 
 func_search() {
 	if [[ -z "$1" ]]; then
-		echo "$LIST"
+		cat "$LIST_FILE"
 		return
 	fi
 	RES=""
 	for t in "$@"; do
-		T=$(${B["grep"]} -e "$t" <<< "$LIST")
+		T=$(${B["grep"]} -e "$t" "$LIST_FILE")
 		! ${B["grep"]} "$T" <<< "$RES" \
 			&& RES+=("$T")
 	done
@@ -162,43 +166,43 @@ func_clean() {
 	${B["rm"]} -rf "$STORE_DIR" || _exit_msg "Could not remove $STORE_DIR" $EPROG
 	mkdir -p "$STORE_DIR"
 }
- 
+
 ################## MISC ##################
- 
+
 func_help() {
-    echo "rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]"
+echo "rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]"
 }
- 
+
 func_HELP() {
 	cat << EOF >> /dev/stdout
-       
-Rem usage:
- 
-    rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]
- 
-  remove:
-    aliases: rm, rem, remove
-    desc:    moves specified file(s) to \$STORE_DIR
-       
-  restore:
-    aliases: rs, res, restore
-    desc:    restore file(s) from \$STORE_DIR (args either with or with \$STORE_DIR prefix)
- 
-  delete:
-    alias:   dl, del, delte
-    desc:    delete files from $STORE_DIR
 
-  search:
-    aliases: sr, sear, search
-    desc:    search files added to \$STORE_DIR, grep expressions as optional args
- 
-  clean:
-    aliases: cl, cln, clean
-    desc:    empty \$STORE_DIR, you will be prompted for assurance
- 
+Rem usage:
+
+rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]
+
+remove:
+aliases: rm, rem, remove
+desc:    moves specified file(s) to \$STORE_DIR
+
+restore:
+aliases: rs, res, restore
+desc:    restore file(s) from \$STORE_DIR (args either with or with \$STORE_DIR prefix)
+
+delete:
+alias:   dl, del, delte
+desc:    delete files from $STORE_DIR
+
+search:
+aliases: sr, sear, search
+desc:    search files added to \$STORE_DIR, grep expressions as optional args
+
+clean:
+aliases: cl, cln, clean
+desc:    empty \$STORE_DIR, you will be prompted for assurance
+
 EOF
 }
- 
+
 func_version() {
 	echo "Rem: 0.0.1"
 }
@@ -206,38 +210,39 @@ func_version() {
 func_VERSION() {
 	cat << EOF >> /dev/stdout
 rem: recycle bin, quick and simple
- 
+
 Copyright © 2019 Benjamin Carrington
- 
+
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2 of the License, or
 (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, see <http://www.gnu.org/licenses/>.
- 
+
 Version: 0.0.1
 EOF
 }
 
 ################## MAIN ##################
- 
+
 _done_check() {
 	[[ -z "$1" && -z "$2" ]] && echo 1
 }
 
 main() {
 	trap _sig_recv SIGINT
- 
+
 	_init__validate_software "grep" "base64" "rm"
 	_init__runtime_vars
- 
+	_init__decode_list &
+
 	argv=()
 	cmd=""
 	arg_end=""
@@ -270,6 +275,7 @@ main() {
 		cmd="remove"
 	fi
 
+	wait
 	"func_$cmd" "${argv[@]}"
 }
 
