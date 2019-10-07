@@ -6,7 +6,7 @@ shopt -s extglob
 
 EPROG=1; EOPTN=2; EFILE=3; EARGS=4;
 
-declare STORE_DIR
+declare STORE_DIR LIST
 declare -A B # BINARIES
 
 LIST_FILE="$(mktemp)"
@@ -83,32 +83,40 @@ _core_no_args() {
 ################## LIST ##################
 
 _check_in_list() {
-	${B["grep"]} -q -e "^$(realpath "$1")$" "$LIST_FILE"
+	${B["grep"]} -q -e "^$(realpath "$1")$" <<< "$LIST"
 }
 
 _remove_from_list() {
-	TMP_FILE="$(mktemp)"
-	${B["grep"]} -v -e "^$1$" "$LIST_FILE" > "$TMP_FILE"
-	mv "$TMP_FILE" "$LIST_FILE"
+	LIST=$(${B["grep"]} -v -e "^$1$" <<< "$LIST")
 }
 
 _add_to_list() {
-	! _check_in_list "$1" && realpath "$1" >> "$LIST_FILE"
+	! _check_in_list "$1" && LIST="$LIST\n$(realpath "$1")"
 }
 
 _b64_filename() {
 	${B["base64"]} <<< "$(realpath "$1")"
 }
 
+_set_list() {
+	wait
+	LIST="$(cat "$LIST_FILE")"
+}
+
 ################## CORE ##################
 
 func_restore() {
 	_core_no_args "$@"
+	_set_list
 	for f in "$@"; do
 		f=${f#"$STORE_DIR"}
 		if ! _check_in_list "$f"; then
-			echo "$f not found in $STORE_DIR, continuing..."
-			continue
+			if _check_in_list "$PWD/$f"; then
+				f="$PWD/$f"
+			else
+				echo "$f not found in $STORE_DIR, continuing..."
+				continue
+			fi
 		fi
 		_remove_from_list "$f"
 		mv "$STORE_DIR/$(_b64_filename "$f")" "$f"
@@ -117,6 +125,7 @@ func_restore() {
 
 func_delete() {
 	_core_no_args "$@"
+	_set_list
 	for f in "$@"; do
 		f=${f#"$STORE_DIR"}
 		if ! _check_in_list "$f"; then
@@ -130,6 +139,7 @@ func_delete() {
 
 func_remove() {
 	_core_no_args "$@"
+	_set_list
 	for f in "$@"; do
 		[[ -z "$f" ]] && continue
 		if [[ "$f" == "$STORE_DIR"* ]]; then
@@ -148,8 +158,9 @@ func_remove() {
 }
 
 func_search() {
+	_set_list
 	if [[ -z "$1" ]]; then
-		cat "$LIST_FILE"
+		echo "$LIST"
 		return
 	fi
 	RES=""
@@ -163,14 +174,13 @@ func_search() {
 
 func_clean() {
 	! _yes_or_no "Are you sure" && _exit_msg "Clean aborted" $EPROG
-	${B["rm"]} -rf "$STORE_DIR" || _exit_msg "Could not remove $STORE_DIR" $EPROG
-	mkdir -p "$STORE_DIR"
+	${B["rm"]} -rf "$STORE_DIR"/* || _exit_msg "Could not remove $STORE_DIR" $EPROG
 }
 
 ################## MISC ##################
 
 func_help() {
-echo "rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]"
+	echo "rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]"
 }
 
 func_HELP() {
@@ -178,27 +188,27 @@ func_HELP() {
 
 Rem usage:
 
-rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]
+		rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]
 
-remove:
-aliases: rm, rem, remove
-desc:    moves specified file(s) to \$STORE_DIR
+	remove:
+		aliases: rm, rem, remove
+		desc:    moves specified file(s) to \$STORE_DIR
 
-restore:
-aliases: rs, res, restore
-desc:    restore file(s) from \$STORE_DIR (args either with or with \$STORE_DIR prefix)
+	restore:
+		aliases: rs, res, restore
+		desc:    restore file(s) from \$STORE_DIR (args either with or with \$STORE_DIR prefix)
 
-delete:
-alias:   dl, del, delte
-desc:    delete files from $STORE_DIR
+	delete:
+		alias:   dl, del, delte
+		desc:    delete files from $STORE_DIR
 
-search:
-aliases: sr, sear, search
-desc:    search files added to \$STORE_DIR, grep expressions as optional args
+	search:
+		aliases: sr, sear, search
+		desc:    search files added to \$STORE_DIR, grep expressions as optional args
 
-clean:
-aliases: cl, cln, clean
-desc:    empty \$STORE_DIR, you will be prompted for assurance
+	clean:
+		aliases: cl, cln, clean
+		desc:    empty \$STORE_DIR, you will be prompted for assurance
 
 EOF
 }
@@ -275,7 +285,6 @@ main() {
 		cmd="remove"
 	fi
 
-	wait
 	"func_$cmd" "${argv[@]}"
 }
 
