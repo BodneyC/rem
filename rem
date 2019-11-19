@@ -19,13 +19,13 @@ _init__runtime_vars() {
 		mkdir -p "$STORE_DIR"
 	else
 		STORE_DIR="$(realpath "$STORE_DIR")"
-		[[ ! -d "$STORE_DIR" ]] && _exit_msg "STORE_DIR: $STORE_DIR does not exist" $EFILE
+		[[ ! -d "$STORE_DIR" ]] && _msg_ext "STORE_DIR: $STORE_DIR does not exist" $EFILE
 	fi
 }
 
 _init__validate_software() {
 	for s in "$@"; do
-		hash "$s" || _exit_msg "\"$s\" not found on \$PATH" $EPROG
+		hash "$s" || _msg_ext "\"$s\" not found on \$PATH" $EPROG
 		B["$s"]="$(which "$s")"
 	done
 }
@@ -40,12 +40,12 @@ _init__decode_list() {
 
 ################## LIB ###################
 
-_exit_msg() {
+_msg_ext() {
 	echo -e "$1, exiting..."; exit "$2"
 }
 
 _sig_recv() {
-	_exit_msg "Signal recieved" $EPROG
+	_msg_ext "Signal recieved" $EPROG
 }
 
 _check_dir_exists() {
@@ -128,12 +128,18 @@ func_delete() {
 	_set_list
 	for f in "$@"; do
 		f=${f#"$STORE_DIR"}
+		file=""
 		if ! _check_in_list "$f"; then
-			echo "$f not found in $STORE_DIR, continuing..."
-			continue
+			if _yes_or_no "$f not found in $STORE_DIR, delete permanently"; then
+				file="$f"
+			else
+				continue
+			fi
+		else
+			_remove_from_list "$f"
+			file="$STORE_DIR/$(_b64_filename "$f")"
 		fi
-		_remove_from_list "$f"
-		${B["rm"]} -rf "$STORE_DIR/$(_b64_filename "$f")"
+		${B["rm"]} -rf "$file"
 	done
 }
 
@@ -173,8 +179,8 @@ func_search() {
 }
 
 func_clean() {
-	! _yes_or_no "Are you sure" && _exit_msg "Clean aborted" $EPROG
-	${B["rm"]} -rf "$STORE_DIR"/* || _exit_msg "Could not remove $STORE_DIR" $EPROG
+	! _yes_or_no "Are you sure" && _msg_ext "Clean aborted" $EPROG
+	${B["rm"]} -rf "$STORE_DIR"/* || _msg_ext "Could not remove $STORE_DIR" $EPROG
 }
 
 ################## MISC ##################
@@ -267,7 +273,7 @@ main() {
 					-v)           [[ -n "$CHECK" ]] && cmd="version" || argv+=("$1") ;;
 					-V|--version) [[ -n "$CHECK" ]] && cmd="VERSION" || argv+=("$1") ;;
 					*)            [[ -n "$CHECK" ]] \
-					                  && _exit_msg "Unknown option: $1" $EOPTN \
+					                  && _msg_ext "Unknown option: $1" $EOPTN \
 					                  || argv+=("$1")
 				esac ;;
 			d?(e)l?(ete))  [[ -n "$CHECK" ]] && cmd="delete"  || argv+=("$1") ;;

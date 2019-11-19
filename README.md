@@ -26,7 +26,6 @@ There are five subcommands (so `rem <subcom>`):
 Nothing more to it really.
 
 ### CLI
-
 ```
 Rem usage:
  
