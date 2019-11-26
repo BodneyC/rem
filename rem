@@ -35,7 +35,8 @@ _init__decode_list() {
 		! [[ -e "$f" ]] && continue
 		${B["base64"]} --decode <<< "$(basename "$f")" >> "$LIST_FILE"
 	done
-	[[ "$(wc -c "$LIST_FILE")" == 0 ]] && echo "Empty" >> "$LIST_FILE"
+	[[ "$(wc -c < "$LIST_FILE")" == 0 ]] \
+		&& echo "Recycle bin empty" > "$LIST_FILE"
 }
 
 ################## LIB ###################
