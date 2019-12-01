@@ -35,14 +35,16 @@ _init__decode_list() {
 		! [[ -e "$f" ]] && continue
 		${B["base64"]} --decode <<< "$(basename "$f")" >> "$LIST_FILE"
 	done
-	[[ "$(wc -c < "$LIST_FILE")" == 0 ]] \
+	[[ "$(wc -c < "$LIST_FILE")" =~ "0" ]] \
 		&& echo "Recycle bin empty" > "$LIST_FILE"
 }
 
 ################## LIB ###################
 
 _msg_ext() {
-	echo -e "$1, exiting..."; exit "$2"
+	echo -e "$1, exiting..."
+	[[ -f "$LIST_FILE" ]] && /bin/rm "$LIST_FILE"
+	exit "$2"
 }
 
 _sig_recv() {
