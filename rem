@@ -117,7 +117,7 @@ func_restore() {
 			if _check_in_list "$PWD/$f"; then
 				f="$PWD/$f"
 			else
-				echo "$f not found in $STORE_DIR, continuing..."
+				echo "\"$f\" not found in $STORE_DIR, continuing..."
 				continue
 			fi
 		fi
@@ -133,7 +133,14 @@ func_delete() {
 		f=${f#"$STORE_DIR"}
 		file=""
 		if ! _check_in_list "$f"; then
-			if _yes_or_no "$f not found in $STORE_DIR, delete permanently"; then
+			printf "%s" "\"$f\" not found in $STORE_DIR"
+			if [[ ! -e "./$f" ]]; then
+				echo " or $(pwd)"
+				continue
+			else
+				echo
+			fi
+			if _yes_or_no "  delete ./$f permanently"; then
 				file="$f"
 			else
 				continue
