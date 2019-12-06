@@ -155,11 +155,10 @@ func_delete() {
 
 func_remove() {
 	_core_no_args "$@"
-	if [[ "$#" -gt 49 ]] \
-			&& _yes_or_no "Fifty or more files, would you prefer to package them"; then
+	if [[ "$#" -gt 19 ]] \
+			&& _yes_or_no "Fifty or more files, would you prefer to delete them"; then
 		# BUG: Passes a blank, no idea why...
-		LEN1=$(( $# - 1 ))
-		func_package "${@:1:$LEN1}"
+		${B["rm"]} -rf "$@"
 		return
 	fi
 	for f in "$@"; do
@@ -196,12 +195,6 @@ func_search() {
 func_clean() {
 	! _yes_or_no "Are you sure" && _msg_ext "Clean aborted" $EPROG
 	${B["rm"]} -rf "$STORE_DIR"/* || _msg_ext "Could not remove $STORE_DIR" $EPROG
-}
-
-func_package() {
-	TMP_DIR="$(mktemp -d -p $(realpath .) XXXXXXXXXXX.REM-PACKAGE)"
-	mv "$@" "$TMP_DIR"
-	func_remove "$TMP_DIR"
 }
 
 ################## MISC ##################
@@ -302,8 +295,7 @@ main() {
 			r?(e)s?(tore))    [[ -n "$CHECK" ]] && cmd="restore" || argv+=("$1") ;;
 			cl?(ea)?(n))      [[ -n "$CHECK" ]] && cmd="clean"   || argv+=("$1") ;;
 			s?(ea)r?(ch))     [[ -n "$CHECK" ]] && cmd="search"  || argv+=("$1") ;;
-			p?(ac)k?(a)g?(e)) [[ -n "$CHECK" ]] && cmd="package" || argv+=("$1") ;;
-			*)             argv+=("$1") ;;
+			*)                                                      argv+=("$1") ;;
 		esac
 		shift
 	done
