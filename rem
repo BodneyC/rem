@@ -156,7 +156,7 @@ func_delete() {
 func_remove() {
 	_core_no_args "$@"
 	if [[ "$#" -gt 19 ]] \
-			&& _yes_or_no "Fifty or more files, would you prefer to delete them"; then
+			&& _yes_or_no "Twenty or more files, would you prefer to delete them"; then
 		# BUG: Passes a blank, no idea why...
 		${B["rm"]} -rf "$@"
 		return
