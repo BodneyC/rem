@@ -35,7 +35,7 @@ _init__decode_list() {
 		! [[ -e "$f" ]] && continue
 		${B["base64"]} --decode <<< "$(basename "$f")" >> "$LIST_FILE"
 	done
-	[[ "$(wc -c < "$LIST_FILE")" =~ "0" ]] \
+	[[ ! -s "$LIST_FILE" ]] \
 		&& echo "Recycle bin empty" > "$LIST_FILE"
 }
 
@@ -67,7 +67,7 @@ _check_file_exists() {
 
 _yes_or_no() {
 	while [[ 1 == 1 ]]; do
-		read -rp "$1 [yn] "
+		read -rp "$1? [yn] "
 		case "$REPLY" in
 			[yY]*) return 0 ;;
 			[nN]*) return 1 ;;
@@ -155,6 +155,13 @@ func_delete() {
 
 func_remove() {
 	_core_no_args "$@"
+	if [[ "$#" -gt 49 ]] \
+			&& _yes_or_no "Fifty or more files, would you prefer to package them"; then
+		# BUG: Passes a blank, no idea why...
+		LEN1=$(( $# - 1 ))
+		func_package "${@:1:$LEN1}"
+		return
+	fi
 	for f in "$@"; do
 		[[ -z "$f" ]] && continue
 		if [[ "$f" == "$STORE_DIR"* ]]; then
@@ -166,7 +173,7 @@ func_remove() {
 			[[ -d "$f" ]] && ${B["rm"]} -rf "$TO_FILE"
 			mv "$f" "$TO_FILE"
 		else
-			echo "File $f does not exist, continuing..."
+			echo "File \"$f\" does not exist, continuing..."
 		fi
 	done
 }
@@ -189,6 +196,12 @@ func_search() {
 func_clean() {
 	! _yes_or_no "Are you sure" && _msg_ext "Clean aborted" $EPROG
 	${B["rm"]} -rf "$STORE_DIR"/* || _msg_ext "Could not remove $STORE_DIR" $EPROG
+}
+
+func_package() {
+	TMP_DIR="$(mktemp -d -p $(realpath .) XXXXXXXXXXX.REM-PACKAGE)"
+	mv "$@" "$TMP_DIR"
+	func_remove "$TMP_DIR"
 }
 
 ################## MISC ##################
@@ -284,11 +297,12 @@ main() {
 					                  && _msg_ext "Unknown option: $1" $EOPTN \
 					                  || argv+=("$1")
 				esac ;;
-			d?(e)l?(ete))  [[ -n "$CHECK" ]] && cmd="delete"  || argv+=("$1") ;;
-			r?(e)m?(ove))  [[ -n "$CHECK" ]] && cmd="remove"  || argv+=("$1") ;;
-			r?(e)s?(tore)) [[ -n "$CHECK" ]] && cmd="restore" || argv+=("$1") ;;
-			cl?(ea)?(n))   [[ -n "$CHECK" ]] && cmd="clean"   || argv+=("$1") ;;
-			s?(ea)r?(ch))  [[ -n "$CHECK" ]] && cmd="search"  || argv+=("$1") ;;
+			d?(e)l?(ete))     [[ -n "$CHECK" ]] && cmd="delete"  || argv+=("$1") ;;
+			r?(e)m?(ove))     [[ -n "$CHECK" ]] && cmd="remove"  || argv+=("$1") ;;
+			r?(e)s?(tore))    [[ -n "$CHECK" ]] && cmd="restore" || argv+=("$1") ;;
+			cl?(ea)?(n))      [[ -n "$CHECK" ]] && cmd="clean"   || argv+=("$1") ;;
+			s?(ea)r?(ch))     [[ -n "$CHECK" ]] && cmd="search"  || argv+=("$1") ;;
+			p?(ac)k?(a)g?(e)) [[ -n "$CHECK" ]] && cmd="package" || argv+=("$1") ;;
 			*)             argv+=("$1") ;;
 		esac
 		shift
