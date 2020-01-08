@@ -167,7 +167,7 @@ func_remove() {
 			echo "Cannot remove file already in $STORE_DIR, continuing..."
 			continue
 		fi
-		if [[ -e "$f" ]]; then
+		if [[ -e "$f" || -L "$f" ]]; then
 			TO_FILE="$STORE_DIR/$(_b64_filename "$f")"
 			[[ -d "$f" ]] && ${B["rm"]} -rf "$TO_FILE"
 			mv "$f" "$TO_FILE"
