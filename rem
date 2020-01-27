@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 #shellcheck disable=SC2230,SC2078,SC2050
 
