@@ -31,12 +31,15 @@ _init__validate_software() {
 }
 
 _init__decode_list() {
-	for f in "$STORE_DIR"/*; do
-		! [[ -e "$f" ]] && continue
-		${B["base64"]} --decode <<< "$(basename "$f")" >> "$LIST_FILE"
-	done
-	[[ ! -s "$LIST_FILE" ]] \
-		&& echo "Recycle bin empty" > "$LIST_FILE"
+	if [[ "$(uname -o)" =~ Linux ]]; then
+		LIST="$(dir -1 "$STORE_DIR" | ${B["base64"]} --decode)"
+	else
+		for f in "$STORE_DIR"/*; do
+			! [[ -e "$f" ]] && continue
+			LIST="$(printf "%s\n%s" "$(${B["base64"]} --decode <<< "$(basename "$f")")" "$LIST")"
+		done
+		LIST="$(head -n -1 <<< "$LIST")"
+	fi
 }
 
 ################## LIB ###################
@@ -101,16 +104,10 @@ _b64_filename() {
 	${B["base64"]} <<< "$(realpath "$1")"
 }
 
-_set_list() {
-	wait
-	LIST="$(cat "$LIST_FILE")"
-}
-
 ################## CORE ##################
 
 func_restore() {
 	_core_no_args "$@"
-	_set_list
 	for f in "$@"; do
 		f=${f#"$STORE_DIR"}
 		if ! _check_in_list "$f"; then
@@ -128,7 +125,6 @@ func_restore() {
 
 func_delete() {
 	_core_no_args "$@"
-	_set_list
 	for f in "$@"; do
 		f=${f#"$STORE_DIR"}
 		file=""
@@ -178,7 +174,6 @@ func_remove() {
 }
 
 func_search() {
-	_set_list
 	if [[ -z "$1" ]]; then
 		echo "$LIST"
 		return
@@ -271,7 +266,7 @@ main() {
 
 	_init__validate_software "grep" "base64" "rm"
 	_init__runtime_vars
-	_init__decode_list &
+	_init__decode_list
 
 	argv=()
 	cmd=""
