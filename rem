@@ -176,16 +176,11 @@ func_remove() {
 }
 
 func_search() {
-	if [[ -z "$1" ]]; then
-		echo "$LIST"
-		return
-	fi
-	RES=""
+	T="$LIST"
 	for t in "$@"; do
-		T=$(${B["grep"]} -e "$t" "$LIST_FILE")
-		! ${B["grep"]} "$T" <<< "$RES" \
-			&& RES+=("$T")
+		T=$(${B["grep"]} -e "$t" <<< "$T")
 	done
+	[[ -z "$T" ]] && T="Recyle bin empty"
 	echo "$T"
 }
 
