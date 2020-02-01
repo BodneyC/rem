@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-#shellcheck disable=SC2230,SC2078,SC2050
-
 shopt -s extglob
 
 EPROG=1; EOPTN=2; EFILE=3; EARGS=4;
@@ -15,6 +13,8 @@ IS_LNX="$([[ "$(uname -s)" =~ Linux ]] && echo 1)"
 ################## INIT ##################
 
 _init__runtime_vars() {
+	[[ "${BASH_VERSINFO[0]}" -lt 4 ]] \
+		&& _msg_ext "Bash version 4+ required" $EPROG
 	if [[ -z "$STORE_DIR" ]]; then
 		STORE_DIR="$HOME/.recycle"
 		mkdir -p "$STORE_DIR"
@@ -71,7 +71,7 @@ _check_file_exists() {
 }
 
 _yes_or_no() {
-	while [[ 1 == 1 ]]; do
+	while true; do
 		read -rp "$1? [yn] "
 		case "$REPLY" in
 			[yY]*) return 0 ;;
@@ -103,7 +103,11 @@ _add_to_list() {
 }
 
 _b64_filename() {
-	${B["base64"]} <<< "$(realpath "$1")"
+	if [[ -n "$IS_LNX" ]]; then
+		${B["base64"]} --wrap 0 <<< "$(realpath "$1")"
+	else
+		${B["base64"]} <<< "$(realpath "$1")"
+	fi
 }
 
 ################## CORE ##################
