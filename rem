@@ -10,6 +10,7 @@ declare STORE_DIR LIST
 declare -A B # BINARIES
 
 LIST_FILE="$(mktemp)"
+IS_LNX="$([[ "$(uname -s)" =~ Linux ]] && echo 1)"
 
 ################## INIT ##################
 
@@ -25,21 +26,22 @@ _init__runtime_vars() {
 
 _init__validate_software() {
 	for s in "$@"; do
-		hash "$s" || _msg_ext "\"$s\" not found on \$PATH" $EPROG
-		B["$s"]="$(which "$s")"
+		hash "$s" > /dev/null 2>&1 || _msg_ext "\"$s\" not found on \$PATH" $EPROG
+		B["$s"]="$(command -v "$s")"
+		{ [[ -z $IS_LNX ]] && hash "g$s" > /dev/null 2>&1; } \
+			&& B["$s"]="$(command -v "g$s")"
 	done
 }
 
 _init__decode_list() {
-	if [[ "$(uname -o)" =~ Linux ]]; then
-		LIST="$(dir -1 "$STORE_DIR" | ${B["base64"]} --decode)"
+	local _list
+	if [[ -n $IS_LNX ]]; then
+		 _list="$(dir -1 "$STORE_DIR")"
 	else
-		for f in "$STORE_DIR"/*; do
-			! [[ -e "$f" ]] && continue
-			LIST="$(printf "%s\n%s" "$(${B["base64"]} --decode <<< "$(basename "$f")")" "$LIST")"
-		done
-		LIST="$(head -n -1 <<< "$LIST")"
+		# shellcheck disable=SC2035
+		_list="$(cd "$STORE_DIR" && find * -maxdepth 0)"
 	fi
+	LIST="$(${B["base64"]} --decode <<< "$_list")"
 }
 
 ################## LIB ###################
