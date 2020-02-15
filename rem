@@ -39,7 +39,7 @@ _init__decode_list() {
 		 _list="$(dir -1 "$STORE_DIR")"
 	else
 		# shellcheck disable=SC2035
-		_list="$(cd "$STORE_DIR" && find * -maxdepth 0)"
+		_list="$(cd "$STORE_DIR" && find * -maxdepth 0 2>/dev/null)"
 	fi
 	LIST="$(${B["base64"]} --decode <<< "$_list")"
 }
