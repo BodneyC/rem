@@ -13,228 +13,231 @@ IS_LNX="$([[ "$(uname -s)" =~ Linux ]] && echo 1)"
 ################## INIT ##################
 
 _init__runtime_vars() {
-	[[ "${BASH_VERSINFO[0]}" -lt 4 ]] \
-		&& _msg_ext "Bash version 4+ required" $EPROG
-	if [[ -z "$STORE_DIR" ]]; then
-		STORE_DIR="$HOME/.recycle"
-		mkdir -p "$STORE_DIR"
-	else
-		STORE_DIR="$(realpath "$STORE_DIR")"
-		[[ ! -d "$STORE_DIR" ]] && _msg_ext "STORE_DIR: $STORE_DIR does not exist" $EFILE
-	fi
+  [[ "${BASH_VERSINFO[0]}" -lt 4 ]] && _msg_ext "Bash 4+ required" $EPROG
+  if [[ -z "$STORE_DIR" ]]; then
+    STORE_DIR="$HOME/.recycle"
+    mkdir -p "$STORE_DIR"
+  else
+    STORE_DIR="$(realpath "$STORE_DIR")"
+    if [[ ! -d "$STORE_DIR" ]]; then 
+      _msg_ext "STORE_DIR: $STORE_DIR does not exist" $EFILE
+    fi
+  fi
 }
 
 _init__validate_software() {
-	for s in "$@"; do
-		hash "$s" > /dev/null 2>&1 || _msg_ext "\"$s\" not found on \$PATH" $EPROG
-		B["$s"]="$(command -v "$s")"
-		{ [[ -z $IS_LNX ]] && hash "g$s" > /dev/null 2>&1; } \
-			&& B["$s"]="$(command -v "g$s")"
-	done
-}
+  for s in "$@"; do
+    hash "$s" > /dev/null 2>&1 || _msg_ext "\"$s\" not found on \$PATH" $EPROG
+    B["$s"]="$(command -v "$s")"
+    { [[ -z $IS_LNX ]] && hash "g$s" > /dev/null 2>&1; } \
+      && B["$s"]="$(command -v "g$s")"
+    done
+  }
 
 _init__decode_list() {
-	local _list
-	if [[ -n $IS_LNX ]]; then
-		 _list="$(dir -1 "$STORE_DIR")"
-	else
-		# shellcheck disable=SC2035
-		_list="$(cd "$STORE_DIR" && find * -maxdepth 0 2>/dev/null)"
-	fi
-	LIST="$(${B["base64"]} --decode <<< "$_list")"
+  local _list
+  if [[ -n $IS_LNX ]]; then
+    _list="$(dir -1 "$STORE_DIR")"
+  else
+    # shellcheck disable=SC2035
+    _list="$(cd "$STORE_DIR" && find * -maxdepth 0 2>/dev/null)"
+  fi
+  LIST="$(${B["base64"]} --decode <<< "$_list")"
 }
 
 ################## LIB ###################
 
 _msg_ext() {
-	echo -e "$1, exiting..."
-	[[ -f "$LIST_FILE" ]] && /bin/rm "$LIST_FILE"
-	exit "$2"
+  echo -e "$1, exiting..."
+  [[ -f "$LIST_FILE" ]] && /bin/rm "$LIST_FILE"
+  exit "$2"
 }
 
 _sig_recv() {
-	_msg_ext "Signal recieved" $EPROG
+  _msg_ext "Signal recieved" $EPROG
 }
 
 _check_dir_exists() {
-	if [[ ! -d "$1" ]]; then
-		echo "$1 not found, creating..."
-		mkdir -p "$1"
-	fi
+  if [[ ! -d "$1" ]]; then
+    echo "$1 not found, creating..."
+    mkdir -p "$1"
+  fi
 }
 
 _check_file_exists() {
-	if [[ ! -f "$1" ]]; then
-		echo "$1 not found, touching..."
-		touch "$1"
-	fi
+  if [[ ! -f "$1" ]]; then
+    echo "$1 not found, touching..."
+    touch "$1"
+  fi
 }
 
 _yes_or_no() {
-	while true; do
-		read -rp "$1? [yn] "
-		case "$REPLY" in
-			[yY]*) return 0 ;;
-			[nN]*) return 1 ;;
-			*)     echo "Invalid option"
-		esac
-	done
+  while true; do
+    read -rp "$1? [yn] "
+    case "$REPLY" in
+      [yY]*) return 0 ;;
+      [nN]*) return 1 ;;
+      *)     echo "Invalid option"
+    esac
+  done
 }
 
 _core_no_args() {
-	if [[ $# -eq 0 ]]; then
-		func_help
-		exit $EARGS
-	fi
+  if [[ $# -eq 0 ]]; then
+    func_help
+    exit $EARGS
+  fi
 }
 
 ################## LIST ##################
 
 _check_in_list() {
-	${B["grep"]} -q -e "^$(realpath "$1")$" <<< "$LIST"
+  ${B["grep"]} -q -e "^$(realpath "$1")$" <<< "$LIST"
 }
 
 _remove_from_list() {
-	LIST=$(${B["grep"]} -v -e "^$1$" <<< "$LIST")
+  LIST=$(${B["grep"]} -v -e "^$1$" <<< "$LIST")
 }
 
 _add_to_list() {
-	! _check_in_list "$1" && LIST="$LIST\n$(realpath "$1")"
+  ! _check_in_list "$1" && LIST="$LIST\n$(realpath "$1")"
 }
 
 _b64_filename() {
-	if [[ -n "$IS_LNX" ]]; then
-		${B["base64"]} --wrap 0 <<< "$(realpath "$1")"
-	else
-		${B["base64"]} <<< "$(realpath "$1")"
-	fi
+  if [[ -n "$IS_LNX" ]]; then
+    ${B["base64"]} --wrap 0 <<< "$(realpath "$1")"
+  else
+    ${B["base64"]} <<< "$(realpath "$1")"
+  fi
 }
 
 ################## CORE ##################
 
 func_restore() {
-	_core_no_args "$@"
-	for f in "$@"; do
-		f=${f#"$STORE_DIR"}
-		if ! _check_in_list "$f"; then
-			if _check_in_list "$PWD/$f"; then
-				f="$PWD/$f"
-			else
-				echo "\"$f\" not found in $STORE_DIR, continuing..."
-				continue
-			fi
-		fi
-		_remove_from_list "$f"
-		mv "$STORE_DIR/$(_b64_filename "$f")" "$f"
-	done
+  _core_no_args "$@"
+  for f in "$@"; do
+    f=${f#"$STORE_DIR"}
+    if ! _check_in_list "$f"; then
+      if _check_in_list "$PWD/$f"; then
+        f="$PWD/$f"
+      else
+        echo "\"$f\" not found in $STORE_DIR, continuing..."
+        continue
+      fi
+    fi
+    _remove_from_list "$f"
+    mv "$STORE_DIR/$(_b64_filename "$f")" "$f"
+  done
 }
 
 func_delete() {
-	_core_no_args "$@"
-	for f in "$@"; do
-		f=${f#"$STORE_DIR"}
-		file=""
-		if ! _check_in_list "$f"; then
-			printf "%s" "\"$f\" not found in $STORE_DIR"
-			if [[ ! -e "./$f" ]]; then
-				echo " or $(pwd)"
-				continue
-			else
-				echo
-			fi
-			if _yes_or_no "  delete ./$f permanently"; then
-				file="$f"
-			else
-				continue
-			fi
-		else
-			_remove_from_list "$f"
-			file="$STORE_DIR/$(_b64_filename "$f")"
-		fi
-		${B["rm"]} -rf "$file"
-	done
+  _core_no_args "$@"
+  for f in "$@"; do
+    f=${f#"$STORE_DIR"}
+    file=""
+    if ! _check_in_list "$f"; then
+      printf "%s" "\"$f\" not found in $STORE_DIR"
+      if [[ ! -e "./$f" ]]; then
+        echo " or $(pwd)"
+        continue
+      else
+        echo
+      fi
+      if _yes_or_no "  delete ./$f permanently"; then
+        file="$f"
+      else
+        continue
+      fi
+    else
+      _remove_from_list "$f"
+      file="$STORE_DIR/$(_b64_filename "$f")"
+    fi
+    ${B["rm"]} -rf "$file"
+  done
 }
 
 func_remove() {
-	_core_no_args "$@"
-	if [[ "$#" -gt 19 ]] \
-			&& _yes_or_no "Twenty or more files, would you prefer to delete them"; then
-		# BUG: Passes a blank, no idea why...
-		${B["rm"]} -rf "$@"
-		return
-	fi
-	for f in "$@"; do
-		[[ -z "$f" ]] && continue
-		if [[ "$f" == "$STORE_DIR"* ]]; then
-			echo "Cannot remove file already in $STORE_DIR, continuing..."
-			continue
-		fi
-		if [[ -e "$f" || -L "$f" ]]; then
-			TO_FILE="$STORE_DIR/$(_b64_filename "$f")"
-			[[ -d "$f" ]] && ${B["rm"]} -rf "$TO_FILE"
-			mv "$f" "$TO_FILE"
-		else
-			echo "File \"$f\" does not exist, continuing..."
-		fi
-	done
+  _core_no_args "$@"
+  if [[ "$#" -gt 19 ]] \
+    && _yes_or_no "Twenty or more files, would you prefer to delete them"; then
+      # FIXME: Passes a blank, no idea why...
+      ${B["rm"]} -rf "$@"
+      return
+  fi
+  for f in "$@"; do
+    [[ -z "$f" ]] && continue
+    if [[ "$f" == "$STORE_DIR"* ]]; then
+      echo "Cannot remove file already in $STORE_DIR, continuing..."
+      continue
+    fi
+    if [[ -e "$f" || -L "$f" ]]; then
+      TO_FILE="$STORE_DIR/$(_b64_filename "$f")"
+      [[ -d "$f" ]] && ${B["rm"]} -rf "$TO_FILE"
+      mv "$f" "$TO_FILE"
+    else
+      echo "File \"$f\" does not exist, continuing..."
+    fi
+  done
 }
 
 func_search() {
-	T="$LIST"
-	for t in "$@"; do
-		T=$(${B["grep"]} -e "$t" <<< "$T")
-	done
-	[[ -z "$T" ]] && T="Recyle bin empty"
-	echo "$T"
+  T="$LIST"
+  for t in "$@"; do
+    T=$(${B["grep"]} -e "$t" <<< "$T")
+  done
+  [[ -z "$T" ]] && T="Recyle bin empty"
+  echo "$T"
 }
 
 func_clean() {
-	! _yes_or_no "Are you sure" && _msg_ext "Clean aborted" $EPROG
-	${B["rm"]} -rf "$STORE_DIR"/* || _msg_ext "Could not remove $STORE_DIR" $EPROG
+  ! _yes_or_no "Are you sure" && _msg_ext "Clean aborted" $EPROG
+  ${B["rm"]} -rf "$STORE_DIR"/* || _msg_ext "Could not remove $STORE_DIR" $EPROG
 }
 
 ################## MISC ##################
 
 func_help() {
-	echo "rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]"
+  echo "rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]"
 }
 
 func_HELP() {
-	cat << EOF >> /dev/stdout
+  cat << EOF >> /dev/stdout
 
 Rem usage:
 
-		rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]
+    rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]
 
-	remove:
-		aliases: rm, rem, remove
-		desc:    moves specified file(s) to \$STORE_DIR
+  remove:
+    aliases: rm, rem, remove
+    desc:    moves specified file(s) to \$STORE_DIR
 
-	restore:
-		aliases: rs, res, restore
-		desc:    restore file(s) from \$STORE_DIR (args either with or with \$STORE_DIR prefix)
+  restore:
+    aliases: rs, res, restore
+    desc:    restore file(s) from \$STORE_DIR (args either with or with 
+             \$STORE_DIR prefix)
 
-	delete:
-		alias:   dl, del, delte
-		desc:    delete files from $STORE_DIR
+  delete:
+    alias:   dl, del, delte
+    desc:    delete files from $STORE_DIR
 
-	search:
-		aliases: sr, sear, search
-		desc:    search files added to \$STORE_DIR, grep expressions as optional args
+  search:
+    aliases: sr, sear, search
+    desc:    search files added to \$STORE_DIR, grep expressions as optional 
+             args
 
-	clean:
-		aliases: cl, cln, clean
-		desc:    empty \$STORE_DIR, you will be prompted for assurance
+  clean:
+    aliases: cl, cln, clean
+    desc:    empty \$STORE_DIR, you will be prompted for assurance
 
 EOF
 }
 
 func_version() {
-	echo "Rem: 0.0.1"
+  echo "Rem: 0.0.1"
 }
 
 func_VERSION() {
-	cat << EOF >> /dev/stdout
+  cat << EOF >> /dev/stdout
 rem: recycle bin, quick and simple
 
 Copyright © 2019 Benjamin Carrington
@@ -259,49 +262,50 @@ EOF
 ################## MAIN ##################
 
 _done_check() {
-	[[ -z "$1" && -z "$2" ]] && echo 1
+  [[ -z "$1" && -z "$2" ]] && echo 1
 }
 
 main() {
-	trap _sig_recv SIGINT
+  trap _sig_recv SIGINT
 
-	_init__validate_software "grep" "base64" "rm"
-	_init__runtime_vars
-	_init__decode_list
+  _init__validate_software "grep" "base64" "rm"
+  _init__runtime_vars
+  _init__decode_list
 
-	argv=()
-	cmd=""
-	arg_end=""
-	[[ $# == 0 ]] && cmd="help"
-	while [[ -n "$1" ]]; do
-		CHECK=$(_done_check "$cmd" "$arg_end")
-		case "$1" in
-			--) arg_end=1 ;;
-			-*) case "$1" in
-					-h)           [[ -n "$CHECK" ]] && cmd="help"    || argv+=("$1") ;;
-					-H|--help)    [[ -n "$CHECK" ]] && cmd="HELP"    || argv+=("$1") ;;
-					-v)           [[ -n "$CHECK" ]] && cmd="version" || argv+=("$1") ;;
-					-V|--version) [[ -n "$CHECK" ]] && cmd="VERSION" || argv+=("$1") ;;
-					*)            [[ -n "$CHECK" ]] \
-					                  && _msg_ext "Unknown option: $1" $EOPTN \
-					                  || argv+=("$1")
-				esac ;;
-			d?(e)l?(ete))     [[ -n "$CHECK" ]] && cmd="delete"  || argv+=("$1") ;;
-			r?(e)m?(ove))     [[ -n "$CHECK" ]] && cmd="remove"  || argv+=("$1") ;;
-			r?(e)s?(tore))    [[ -n "$CHECK" ]] && cmd="restore" || argv+=("$1") ;;
-			cl?(ea)?(n))      [[ -n "$CHECK" ]] && cmd="clean"   || argv+=("$1") ;;
-			s?(ea)r?(ch))     [[ -n "$CHECK" ]] && cmd="search"  || argv+=("$1") ;;
-			*)                                                      argv+=("$1") ;;
-		esac
-		shift
-	done
+  argv=()
+  cmd=""
+  arg_end=""
+  [[ $# == 0 ]] && cmd="help"
+  while [[ -n "$1" ]]; do
+    CHECK=$(_done_check "$cmd" "$arg_end")
+    case "$1" in
+      --) arg_end=1 ;;
+      -*) 
+        case "$1" in
+          -h)           [[ -n "$CHECK" ]] && cmd="help"    || argv+=("$1") ;;
+          -H|--help)    [[ -n "$CHECK" ]] && cmd="HELP"    || argv+=("$1") ;;
+          -v)           [[ -n "$CHECK" ]] && cmd="version" || argv+=("$1") ;;
+          -V|--version) [[ -n "$CHECK" ]] && cmd="VERSION" || argv+=("$1") ;;
+          *)            [[ -n "$CHECK" ]] && _msg_ext "Unknown option: $1" $EOPTN || argv+=("$1")
+        esac ;;
+      d?(e)l?(ete))     [[ -n "$CHECK" ]] && cmd="delete"  || argv+=("$1") ;;
+      r?(e)m?(ove))     [[ -n "$CHECK" ]] && cmd="remove"  || argv+=("$1") ;;
+      r?(e)s?(tore))    [[ -n "$CHECK" ]] && cmd="restore" || argv+=("$1") ;;
+      cl?(ea)?(n))      [[ -n "$CHECK" ]] && cmd="clean"   || argv+=("$1") ;;
+      s?(ea)r?(ch))     [[ -n "$CHECK" ]] && cmd="search"  || argv+=("$1") ;;
+      *)                argv+=("$1") ;;
+    esac
+    shift
+  done
 
-	if ! type "func_$cmd" >& /dev/null; then
-		argv+=("$cmd")
-		cmd="remove"
-	fi
+  if ! type "func_$cmd" >& /dev/null; then
+    argv+=("$cmd")
+    cmd="remove"
+  fi
 
-	"func_$cmd" "${argv[@]}"
+  "func_$cmd" "${argv[@]}"
 }
 
 main "$@"
+
+# vim: sw=2 ts=2 tw=100
