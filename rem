@@ -185,13 +185,13 @@ func_search() {
   for t in "$@"; do
     T=$(${B["grep"]} -e "$t" <<< "$T")
   done
-  [[ -z "$T" ]] && T="Recyle bin empty"
+  [[ -z "$T" ]] && T="Recyle bin empty [$USER]"
   echo "$T"
 }
 
 func_clean() {
   ! _yes_or_no "Are you sure" && _msg_ext "Clean aborted" $EPROG
-  ${B["rm"]} -rf "$STORE_DIR"/* || _msg_ext "Could not remove $STORE_DIR" $EPROG
+  { ${B["rm"]} -rf "$STORE_DIR" && mkdir -p "$STORE_DIR"; } || _msg_ext "Could not remove $STORE_DIR" $EPROG
 }
 
 ################## MISC ##################
