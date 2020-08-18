@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+__REM_VERSION=1.0.0
+
+if command -v tput &> /dev/null && [[ -z "$NO_COLOR" ]]; then
+  SUCC_COL=$(tput setaf 2)
+  ERRO_COL=$(tput setaf 1)
+  WARN_COL=$(tput setaf 3)
+  EMPH_COL=$(tput setaf 4)
+  NORM_COL=$(tput sgr0)
+fi
+
 shopt -s extglob
 
 EPROG=1; EOPTN=2; EFILE=3; EARGS=4;
@@ -121,7 +131,7 @@ func_restore() {
       if _check_in_list "$PWD/$f"; then
         f="$PWD/$f"
       else
-        echo "\"$f\" not found in $STORE_DIR, continuing..."
+        echo "$WARN_COL\"$f\" not found in $STORE_DIR, continuing...$NORM_COL"
         continue
       fi
     fi
@@ -136,12 +146,12 @@ func_delete() {
     f=${f#"$STORE_DIR"}
     file=""
     if ! _check_in_list "$f"; then
-      printf "%s" "\"$f\" not found in $STORE_DIR"
+      printf "%s" "$WARN_COL\"$f\" not found in $STORE_DIR"
       if [[ ! -e "./$f" ]]; then
-        echo " or $(pwd)"
+        echo " or $(pwd)$NORM_COL"
         continue
       else
-        echo
+        echo "$NORM_COL"
       fi
       if _yes_or_no "  delete ./$f permanently"; then
         file="$f"
@@ -167,7 +177,7 @@ func_remove() {
   for f in "$@"; do
     [[ -z "$f" ]] && continue
     if [[ "$f" == "$STORE_DIR"* ]]; then
-      echo "Cannot remove file already in $STORE_DIR, continuing..."
+      echo "${WARN_COL}Cannot remove file already in $STORE_DIR, continuing...$NORM_COL"
       continue
     fi
     if [[ -e "$f" || -L "$f" ]]; then
@@ -175,7 +185,7 @@ func_remove() {
       [[ -d "$f" ]] && ${B["rm"]} -rf "$TO_FILE"
       mv "$f" "$TO_FILE"
     else
-      echo "File \"$f\" does not exist, continuing..."
+      echo "${WARN_COL}File \"$f\" does not exist, continuing...$NORM_COL"
     fi
   done
 }
@@ -200,46 +210,47 @@ func_help() {
   echo "rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]"
 }
 
+#readable_code
 func_HELP() {
   cat << EOF >> /dev/stdout
 
-Rem usage:
+${SUCC_COL}Rem, a simple recycle bin script; usage:$NORM_COL
 
-    rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]
+    ${WARN_COL}rem ${ERRO_COL}[${EMPH_COL}(${WARN_COL}--help${EMPH_COL}|${WARN_COL}--version${EMPH_COL})${ERRO_COL}] ${EMPH_COL}(${WARN_COL}remove${EMPH_COL}|${WARN_COL}restore${EMPH_COL}|${WARN_COL}delete${EMPH_COL}|${WARN_COL}clean${EMPH_COL}|${WARN_COL}search${EMPH_COL}) ${ERRO_COL}[${EMPH_COL}<${WARN_COL}args${EMPH_COL}>${ERRO_COL}]${NORM_COL}
 
-  remove:
-    aliases: rm, rem, remove
-    desc:    moves specified file(s) to \$STORE_DIR
+${SUCC_COL}Options:${NORM_COL}
 
-  restore:
-    aliases: rs, res, restore
-    desc:    restore file(s) from \$STORE_DIR (args either with or with 
-             \$STORE_DIR prefix)
+  ${WARN_COL}remove${NORM_COL}:
+    ${EMPH_COL}aliases${NORM_COL}: ${WARN_COL}rm${NORM_COL}, ${WARN_COL}rem${NORM_COL}, ${WARN_COL}remove${NORM_COL}
+    ${EMPH_COL}desc${NORM_COL}:    moves specified file(s) to ${ERRO_COL}\$STORE_DIR${NORM_COL}
 
-  delete:
-    alias:   dl, del, delte
-    desc:    delete files from $STORE_DIR
+  ${WARN_COL}restore${NORM_COL}:
+    ${EMPH_COL}aliases${NORM_COL}: ${WARN_COL}rs${NORM_COL}, ${WARN_COL}res${NORM_COL}, ${WARN_COL}restore${NORM_COL}
+    ${EMPH_COL}desc${NORM_COL}:    restore file(s) from ${ERRO_COL}\$STORE_DIR${NORM_COL} (args either with or with 
+             ${ERRO_COL}\$STORE_DIR${NORM_COL} prefix)
 
-  search:
-    aliases: sr, sear, search
-    desc:    search files added to \$STORE_DIR, grep expressions as optional 
+  ${WARN_COL}delete${NORM_COL}:
+    ${EMPH_COL}alias${NORM_COL}:   ${WARN_COL}dl${NORM_COL}, ${WARN_COL}del${NORM_COL}, ${WARN_COL}delte${NORM_COL}
+    ${EMPH_COL}desc${NORM_COL}:    delete files from ${ERRO_COL}\$STORE_DIR${NORM_COL}
+
+  ${WARN_COL}search${NORM_COL}:
+    ${EMPH_COL}aliases${NORM_COL}: ${WARN_COL}sr${NORM_COL}, ${WARN_COL}sear${NORM_COL}, ${WARN_COL}search${NORM_COL}
+    ${EMPH_COL}desc${NORM_COL}:    search files added to ${ERRO_COL}\$STORE_DIR${NORM_COL}, grep expressions as optional 
              args
 
-  clean:
-    aliases: cl, cln, clean
-    desc:    empty \$STORE_DIR, you will be prompted for assurance
+  ${WARN_COL}clean${NORM_COL}:
+    ${EMPH_COL}aliases${NORM_COL}: ${WARN_COL}cl${NORM_COL}, ${WARN_COL}cln${NORM_COL}, ${WARN_COL}clean${NORM_COL}
+    ${EMPH_COL}desc${NORM_COL}:    empty ${ERRO_COL}\$STORE_DIR${NORM_COL}, you will be prompted for assurance
 
 EOF
 }
 
 func_version() {
-  echo "Rem: 0.0.1"
+  echo "Rem: $__REM_VERSION"
 }
 
 func_VERSION() {
   cat << EOF >> /dev/stdout
-rem: recycle bin, quick and simple
-
 Copyright © 2019 Benjamin Carrington
 
 This program is free software; you can redistribute it and/or modify
@@ -255,7 +266,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, see <http://www.gnu.org/licenses/>.
 
-Version: 0.0.1
+Version: $__REM_VERSION
 EOF
 }
 
@@ -308,4 +319,4 @@ main() {
 
 main "$@"
 
-# vim: sw=2 ts=2 tw=100
+# vim: sw=2 ts=2
