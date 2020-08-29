@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-__REM_VERSION=1.0.0
+__REM_VERSION=1.0.1
 
 if command -v tput &> /dev/null && [[ -z "$NO_COLOR" ]]; then
   SUCC_COL=$(tput setaf 2)
@@ -82,13 +82,13 @@ _check_file_exists() {
 }
 
 _yes_or_no() {
-  while true; do
-    read -rp "$1? [yn] "
+  while read -rp "$1? [yn] "; do
     case "$REPLY" in
       [yY]*) return 0 ;;
       [nN]*) return 1 ;;
-      *)     echo "Invalid option"
+      *)     echo -e "$ERRO_COL    invalid option ($REPLY)$NORM_COL"
     esac
+    echo -en "\e[1A\e[1A\e[2K"
   done
 }
 
@@ -147,13 +147,13 @@ func_delete() {
     file=""
     if ! _check_in_list "$f"; then
       printf "%s" "$WARN_COL\"$f\" not found in $STORE_DIR"
-      if [[ ! -e "./$f" ]]; then
-        echo " or $(pwd)$NORM_COL"
+      if [[ ! -e "$f" ]]; then
+        echo " or relative$NORM_COL"
         continue
       else
         echo "$NORM_COL"
       fi
-      if _yes_or_no "  delete ./$f permanently"; then
+      if _yes_or_no "  delete \"$f\" permanently"; then
         file="$f"
       else
         continue
@@ -195,7 +195,13 @@ func_search() {
   for t in "$@"; do
     T=$(${B["grep"]} -e "$t" <<< "$T")
   done
-  [[ -z "$T" ]] && T="Recyle bin empty [$USER]"
+  if [[ -z "$T" ]]; then
+    if [[ -z $1 ]]; then
+      T="Recyle bin empty [$USER]"
+    else
+      T="No results [$USER]"
+    fi
+  fi
   echo "$T"
 }
 

@@ -1,5 +1,4 @@
-rem
-===
+# Rem
 
 `rem` is a quick and simple recyle bin, I've tried a few other scripts and they were clunky and, at times, a little broken.
 
@@ -26,15 +25,16 @@ There are five subcommands (so `rem <subcom>`):
 Nothing more to it really.
 
 ### CLI
-```
+
+```txt
 Rem usage:
- 
+
     rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]
- 
+
   remove:
     aliases: rm, rem, remove
     desc:    moves specified file(s) to $STORE_DIR
-       
+
   restore:
     aliases: rs, res, restore
     desc:    restore file(s) from $STORE_DIR (args either with or with $STORE_DIR prefix)
@@ -46,9 +46,8 @@ Rem usage:
   search:
     aliases: sr, sear, search
     desc:    search files added to \$STORE_DIR, grep expressions as optional args
- 
+
   clean:
     aliases: cl, cln, clean
     desc:    empty $STORE_DIR, you will be prompted for assurance
 ```
- 
