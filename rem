@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-__REM_VERSION=1.0.2
+__REM_VERSION=1.1.0
 
 if command -v tput &> /dev/null && [[ -z "$NO_COLOR" ]]; then
   SUCC_COL=$(tput setaf 2)
@@ -20,7 +20,7 @@ EARGS=4
 declare STORE_DIR LIST
 declare -A B # BINARIES
 
-LIST_FILE="$(mktemp)"
+TMP_FILE="$(mktemp)"
 IS_LNX="$([[ "$(uname -s)" =~ Linux ]] && echo 1)"
 
 ################## INIT ##################
@@ -35,6 +35,10 @@ _init__runtime_vars() {
     if [[ ! -d "$STORE_DIR" ]]; then
       _msg_ext "STORE_DIR: $STORE_DIR does not exist" $EFILE
     fi
+  fi
+  HISTORY_FILE="$STORE_DIR/.rem-history"
+  if [[ ! -f "$HISTORY_FILE" ]]; then
+    touch "$HISTORY_FILE"
   fi
 }
 
@@ -62,7 +66,7 @@ _init__decode_list() {
 
 _msg_ext() {
   echo -e "$1, exiting..."
-  [[ -f "$LIST_FILE" ]] && /bin/rm "$LIST_FILE"
+  [[ -f "$TMP_FILE" ]] && /bin/rm -- "$TMP_FILE"
   exit "$2"
 }
 
@@ -129,6 +133,22 @@ _b64_filename() {
   fi
 }
 
+################## HISTORY ##################
+
+_add_to_history() {
+  [[ "$REM_HISTORY" == 1 ]] || return
+  f="$(realpath "$1")"
+  if ${B["grep"]} -q -e "^$f$" "$HISTORY_FILE"; then
+    _remove_from_history "$f"
+  fi
+  echo "$f" >> "$HISTORY_FILE"
+}
+
+_remove_from_history() {
+  ${B["grep"]} -v -e "^$(realpath "$1")$" "$HISTORY_FILE" > "$TMP_FILE"
+  cp "$TMP_FILE" "$HISTORY_FILE"
+}
+
 ################## CORE ##################
 
 func_research() {
@@ -149,9 +169,14 @@ func_research() {
   IFS="$_ifs"
 }
 
+func_last() {
+  func_restore "$(tail -1 "$HISTORY_FILE")"
+}
+
 func_restore() {
   _core_no_args "$@"
   for f in "$@"; do
+    [[ -z "$f" ]] && continue
     f=${f#"$STORE_DIR"}
     if ! _check_in_list "$f"; then
       if _check_in_list "$PWD/$f"; then
@@ -162,6 +187,15 @@ func_restore() {
       fi
     fi
     _remove_from_list "$f"
+    _remove_from_history "$f"
+    if [[ -d "$f" ]]; then
+      _msg_inf "%s" "$WARN_COL\"$f\" already exists as a directory"
+      if _yes_or_no "  delete existing \"$f\""; then
+        ${B["rm"]} -rf -- "$f"
+      else
+        continue
+      fi
+    fi
     mv "$STORE_DIR/$(_b64_filename "$f")" "$f"
   done
 }
@@ -188,7 +222,7 @@ func_delete() {
       _remove_from_list "$f"
       file="$STORE_DIR/$(_b64_filename "$f")"
     fi
-    ${B["rm"]} -rf "$file"
+    ${B["rm"]} -rf -- "$file"
   done
 }
 
@@ -196,8 +230,7 @@ func_remove() {
   _core_no_args "$@"
   if [[ "$#" -gt 19 ]] \
     && _yes_or_no "Twenty or more files, would you prefer to delete them"; then
-    # FIXME: Passes a blank, no idea why...
-    ${B["rm"]} -rf "$@"
+    ${B["rm"]} -rf -- "$@"
     return
   fi
   for f in "$@"; do
@@ -208,7 +241,8 @@ func_remove() {
     fi
     if [[ -e "$f" || -L "$f" ]]; then
       TO_FILE="$STORE_DIR/$(_b64_filename "$f")"
-      [[ -d "$f" ]] && ${B["rm"]} -rf "$TO_FILE"
+      [[ -d "$f" ]] && ${B["rm"]} -rf -- "$TO_FILE"
+      _add_to_history "$f" &
       mv "$f" "$TO_FILE"
     else
       _msg_inf "%s\n" "${WARN_COL}File \"$f\" does not exist, continuing...$NORM_COL"
@@ -233,7 +267,8 @@ func_search() {
 
 func_clean() {
   ! _yes_or_no "Are you sure" && _msg_ext "Clean aborted" $EPROG
-  { ${B["rm"]} -rf "$STORE_DIR" && mkdir -p "$STORE_DIR"; } || _msg_ext "Could not remove $STORE_DIR" $EPROG
+  { ${B["rm"]} -rf -- "$STORE_DIR" && mkdir -p "$STORE_DIR"; } \
+    || _msg_ext "Could not remove $STORE_DIR" $EPROG
 }
 
 ################## MISC ##################
@@ -248,7 +283,7 @@ func_HELP() {
 
 ${SUCC_COL}Rem, a simple recycle bin script; usage:$NORM_COL
 
-    ${WARN_COL}rem ${ERRO_COL}[${EMPH_COL}(${WARN_COL}--help${EMPH_COL}|${WARN_COL}--version${EMPH_COL}|${WARN_COL}--no-colors${EMPH_COL}|${WARN_COL}--no-prompt${EMPH_COL})${ERRO_COL}] ${NORM_COL}\\
+    ${WARN_COL}rem ${ERRO_COL}[${EMPH_COL}(${WARN_COL}--help${EMPH_COL}|${WARN_COL}--version${EMPH_COL}|${WARN_COL}--no-colors${EMPH_COL}|${WARN_COL}--no-prompt${EMPH_COL}|${WARN_COL}--history${EMPH_COL})${ERRO_COL}] ${NORM_COL}\\
         ${EMPH_COL}(${WARN_COL}remove${EMPH_COL}|${WARN_COL}restore${EMPH_COL}|${WARN_COL}research${EMPH_COL}|${WARN_COL}delete${EMPH_COL}|${WARN_COL}clean${EMPH_COL}|${WARN_COL}search${EMPH_COL}) ${NORM_COL}\\
         ${ERRO_COL}[${EMPH_COL}<${WARN_COL}args${EMPH_COL}>${ERRO_COL}]${NORM_COL}
 
@@ -311,15 +346,15 @@ EOF
 
 ################## MAIN ##################
 
-_done_check() {
-  [[ -z "$1" && -z "$2" ]] && echo 1
-}
-
 _no_color() {
   ERRO_COL=''
   SUCC_COL=''
   WARN_COL=''
   EMPH_COL=''
+}
+
+_done_check() {
+  [[ -z "$1" && -z "$2" ]] && echo 1
 }
 
 main() {
@@ -339,8 +374,9 @@ main() {
       --) arg_end=1 ;;
       -*)
         case "$1" in
-          -n | --no-color)  [[ -z "$arg_end" ]] && _no_color       || argv+=("$1") ;;
+          --hist?(ory))     [[ -z "$arg_end" ]] && REM_HISTORY=1   || argv+=("$1") ;;
           -p | --no-prompt) [[ -z "$arg_end" ]] && REM_NO_PROMPT=1 || argv+=("$1") ;;
+          -n | --no-color)  [[ -z "$arg_end" ]] && _no_color       || argv+=("$1") ;;
           -h)               [[ -n "$CHECK" ]]   && cmd="help"      || argv+=("$1") ;;
           -H | --help)      [[ -n "$CHECK" ]]   && cmd="HELP"      || argv+=("$1") ;;
           -v)               [[ -n "$CHECK" ]]   && cmd="version"   || argv+=("$1") ;;
@@ -348,12 +384,13 @@ main() {
           *)                [[ -n "$CHECK" ]]   && _msg_ext "Unknown option: $1" $EOPTN || argv+=("$1") ;;
         esac
         ;;
-      d?(e)l?(ete))   [[ -n "$CHECK" ]] && cmd="delete"   || argv+=("$1") ;;
-      r?(e)m?(ove))   [[ -n "$CHECK" ]] && cmd="remove"   || argv+=("$1") ;;
-      r?(e)s?(tore))  [[ -n "$CHECK" ]] && cmd="restore"  || argv+=("$1") ;;
-      r?(esea)r?(ch)) [[ -n "$CHECK" ]] && cmd="research" || argv+=("$1") ;;
-      cl?(ea)?(n))    [[ -n "$CHECK" ]] && cmd="clean"    || argv+=("$1") ;;
-      s?(ea)r?(ch))   [[ -n "$CHECK" ]] && cmd="search"   || argv+=("$1") ;;
+      d?(e)l?(ete))    [[ -n "$CHECK" ]] && cmd="delete"   || argv+=("$1") ;;
+      r?(e)m?(ove))    [[ -n "$CHECK" ]] && cmd="remove"   || argv+=("$1") ;;
+      r?(e)s?(tore))   [[ -n "$CHECK" ]] && cmd="restore"  || argv+=("$1") ;;
+      r?(esea)r?(ch))  [[ -n "$CHECK" ]] && cmd="research" || argv+=("$1") ;;
+      cl?(ea)?(n))     [[ -n "$CHECK" ]] && cmd="clean"    || argv+=("$1") ;;
+      s?(ea)r?(ch))    [[ -n "$CHECK" ]] && cmd="search"   || argv+=("$1") ;;
+      ?(restore-)last) [[ -n "$CHECK" ]] && cmd="last"     || argv+=("$1") ;;
       *) argv+=("$1") ;;
     esac
     shift
