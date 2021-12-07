@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
 
-__REM_VERSION=1.1.0
+__REM_VERSION=1.2.0
 
 if command -v tput &> /dev/null && [[ -z "$NO_COLOR" ]]; then
-  SUCC_COL=$(tput setaf 2)
-  ERRO_COL=$(tput setaf 1)
-  WARN_COL=$(tput setaf 3)
-  EMPH_COL=$(tput setaf 4)
-  NORM_COL=$(tput sgr0)
+  C_RED=$(tput setaf 1)
+  C_GRN=$(tput setaf 2)
+  C_YLW=$(tput setaf 3)
+  C_BLU=$(tput setaf 4)
+  C_RST=$(tput sgr0)
 fi
+
+_no_color() {
+  C_RED=''
+  C_GRN=''
+  C_YLW=''
+  C_BLU=''
+}
 
 shopt -s extglob
 
@@ -20,7 +27,6 @@ EARGS=4
 declare STORE_DIR LIST
 declare -A B # BINARIES
 
-TMP_FILE="$(mktemp)"
 IS_LNX="$([[ "$(uname -s)" =~ Linux ]] && echo 1)"
 
 ################## INIT ##################
@@ -51,22 +57,14 @@ _init__validate_software() {
   done
 }
 
-_init__decode_list() {
-  local _list
-  if [[ -n $IS_LNX ]]; then
-    _list="$(dir -1 "$STORE_DIR")"
-  else
-    # shellcheck disable=SC2035
-    _list="$(cd "$STORE_DIR" && find * -maxdepth 0 2> /dev/null)"
-  fi
-  LIST="$(${B["base64"]} --decode <<< "$_list")"
+_init__read_list() {
+  LIST="$(<"$HISTORY_FILE")"
 }
 
 ################## LIB ###################
 
 _msg_ext() {
-  echo -e "$1, exiting..."
-  [[ -f "$TMP_FILE" ]] && /bin/rm -- "$TMP_FILE"
+  echo -e "${C_RED}$1, exiting...${C_RST}"
   exit "$2"
 }
 
@@ -75,21 +73,7 @@ _msg_inf() {
 }
 
 _sig_recv() {
-  _msg_ext "Signal recieved" $EPROG
-}
-
-_check_dir_exists() {
-  if [[ ! -d "$1" ]]; then
-    echo "$1 not found, creating..."
-    mkdir -p "$1"
-  fi
-}
-
-_check_file_exists() {
-  if [[ ! -f "$1" ]]; then
-    echo "$1 not found, touching..."
-    touch "$1"
-  fi
+  _msg_ext "\nSignal recieved" $EPROG
 }
 
 _yes_or_no() {
@@ -98,7 +82,7 @@ _yes_or_no() {
     case "$REPLY" in
       [yY]*) return 0 ;;
       [nN]*) return 1 ;;
-      *) echo -e "$ERRO_COL    invalid option ($REPLY)$NORM_COL" ;;
+      *) echo -e "$C_RED    invalid option ($REPLY)$C_RST" ;;
     esac
     echo -en "\e[1A\e[1A\e[2K"
   done
@@ -122,7 +106,13 @@ _remove_from_list() {
 }
 
 _add_to_list() {
-  ! _check_in_list "$1" && LIST="$LIST\n$(realpath "$1")"
+  if ! _check_in_list "$1"; then
+    if [[ -z "$LIST" ]]; then
+      LIST="$(realpath "$1")"
+    else
+      LIST="$LIST\n$(realpath "$1")"
+    fi
+  fi
 }
 
 _b64_filename() {
@@ -135,18 +125,8 @@ _b64_filename() {
 
 ################## HISTORY ##################
 
-_add_to_history() {
-  [[ "$REM_HISTORY" == 1 ]] || return
-  f="$(realpath "$1")"
-  if ${B["grep"]} -q -e "^$f$" "$HISTORY_FILE"; then
-    _remove_from_history "$f"
-  fi
-  echo "$f" >> "$HISTORY_FILE"
-}
-
-_remove_from_history() {
-  ${B["grep"]} -v -e "^$(realpath "$1")$" "$HISTORY_FILE" > "$TMP_FILE"
-  cp "$TMP_FILE" "$HISTORY_FILE"
+_write_history_file() {
+  echo -e "$LIST" > "$HISTORY_FILE"
 }
 
 ################## CORE ##################
@@ -159,7 +139,7 @@ func_research() {
       echo "${_search[0]}"
       return
     fi
-    _msg_inf "%s\n" "${WARN_COL}About to restore:${NORM_COL}"
+    _msg_inf "%s\n" "${C_YLW}About to restore:${C_RST}"
     printf "  %s\n" "${_search[@]}"
     if _yes_or_no "continue"; then
       func_restore "${_search[@]}"
@@ -170,7 +150,12 @@ func_research() {
 }
 
 func_last() {
-  func_restore "$(tail -1 "$HISTORY_FILE")"
+  _last="$(tail -1 "$HISTORY_FILE")"
+  if [[ -z "$_last" ]]; then
+    _msg_ext "No last file in history" $EOPTN
+  fi
+  _msg_inf "%s\n" "${C_YLW}Restore:${C_RST} $_last"
+  func_restore "$_last"
 }
 
 func_restore() {
@@ -182,14 +167,13 @@ func_restore() {
       if _check_in_list "$PWD/$f"; then
         f="$PWD/$f"
       else
-        echo "$WARN_COL\"$f\" not found in $STORE_DIR, continuing...$NORM_COL"
+        echo "$C_YLW\"$f\" not found in $STORE_DIR, continuing...$C_RST"
         continue
       fi
     fi
     _remove_from_list "$f"
-    _remove_from_history "$f"
     if [[ -d "$f" ]]; then
-      _msg_inf "%s" "$WARN_COL\"$f\" already exists as a directory"
+      _msg_inf "%s" "$C_YLW\"$f\" already exists as a directory"
       if _yes_or_no "  delete existing \"$f\""; then
         ${B["rm"]} -rf -- "$f"
       else
@@ -198,6 +182,7 @@ func_restore() {
     fi
     mv "$STORE_DIR/$(_b64_filename "$f")" "$f"
   done
+  _write_history_file
 }
 
 func_delete() {
@@ -206,12 +191,12 @@ func_delete() {
     f=${f#"$STORE_DIR"}
     file=""
     if ! _check_in_list "$f"; then
-      _msg_inf "%s" "$WARN_COL\"$f\" not found in $STORE_DIR"
+      _msg_inf "%s" "$C_YLW\"$f\" not found in $STORE_DIR"
       if [[ ! -e "$f" ]]; then
-        _msg_inf "%s\n" " or relative$NORM_COL"
+        _msg_inf "%s\n" " or relative$C_RST"
         continue
       else
-        _msg_inf "%s\n" "$NORM_COL"
+        _msg_inf "%s\n" "$C_RST"
       fi
       if _yes_or_no "  delete \"$f\" permanently"; then
         file="$f"
@@ -224,6 +209,7 @@ func_delete() {
     fi
     ${B["rm"]} -rf -- "$file"
   done
+  _write_history_file
 }
 
 func_remove() {
@@ -236,18 +222,19 @@ func_remove() {
   for f in "$@"; do
     [[ -z "$f" ]] && continue
     if [[ "$f" == "$STORE_DIR"* ]]; then
-      _msg_inf "%s\n" "${WARN_COL}Cannot remove file already in $STORE_DIR, continuing...$NORM_COL"
+      _msg_inf "%s\n" "${C_YLW}Cannot remove file already in $STORE_DIR, continuing...$C_RST"
       continue
     fi
     if [[ -e "$f" || -L "$f" ]]; then
       TO_FILE="$STORE_DIR/$(_b64_filename "$f")"
       [[ -d "$f" ]] && ${B["rm"]} -rf -- "$TO_FILE"
-      _add_to_history "$f" &
+      _add_to_list "$f"
       mv "$f" "$TO_FILE"
     else
-      _msg_inf "%s\n" "${WARN_COL}File \"$f\" does not exist, continuing...$NORM_COL"
+      _msg_inf "%s\n" "${C_YLW}File \"$f\" does not exist, continuing...$C_RST"
     fi
   done
+  _write_history_file
 }
 
 func_search() {
@@ -274,47 +261,58 @@ func_clean() {
 ################## MISC ##################
 
 func_help() {
-  echo "rem [(--help|--version)] (remove|restore|research|delete|clean|search) [<args>]"
+  echo "rem [--help] (remove|restore|delete|clean|search) [<args>]"
 }
 
 #readable_code
 func_HELP() {
   cat << EOF >> /dev/stdout
 
-${SUCC_COL}Rem, a simple recycle bin script; usage:$NORM_COL
+${C_GRN}Rem, a simple recycle bin script; usage:$C_RST
 
-    ${WARN_COL}rem ${ERRO_COL}[${EMPH_COL}(${WARN_COL}--help${EMPH_COL}|${WARN_COL}--version${EMPH_COL}|${WARN_COL}--no-colors${EMPH_COL}|${WARN_COL}--no-prompt${EMPH_COL}|${WARN_COL}--history${EMPH_COL})${ERRO_COL}] ${NORM_COL}\\
-        ${EMPH_COL}(${WARN_COL}remove${EMPH_COL}|${WARN_COL}restore${EMPH_COL}|${WARN_COL}research${EMPH_COL}|${WARN_COL}delete${EMPH_COL}|${WARN_COL}clean${EMPH_COL}|${WARN_COL}search${EMPH_COL}) ${NORM_COL}\\
-        ${ERRO_COL}[${EMPH_COL}<${WARN_COL}args${EMPH_COL}>${ERRO_COL}]${NORM_COL}
+    ${C_YLW}rem ${C_RED}[${C_BLU}(${C_YLW}--help${C_BLU}|${C_YLW}--version${C_BLU}|${C_YLW}--no-colors${C_BLU}|${C_YLW}--force${C_BLU})${C_RED}] ${C_RST}\\
+        ${C_BLU}(${C_YLW}remove${C_BLU}|${C_YLW}restore${C_BLU}|${C_YLW}research${C_BLU}|${C_YLW}delete${C_BLU}|${C_YLW}clean${C_BLU}|${C_YLW}search${C_BLU}|${C_YLW}last${C_BLU}) ${C_RST}\\
+        ${C_RED}[${C_BLU}<${C_YLW}args${C_BLU}>${C_RED}]${C_RST}
 
-${SUCC_COL}Options:${NORM_COL}
+${C_GRN}Options:${C_RST}
 
-  ${WARN_COL}remove${NORM_COL}:
-    ${EMPH_COL}aliases${NORM_COL}: ${WARN_COL}rm${NORM_COL}, ${WARN_COL}rem${NORM_COL}, ${WARN_COL}remove${NORM_COL}
-    ${EMPH_COL}desc${NORM_COL}:    moves specified file(s) to ${ERRO_COL}\$STORE_DIR${NORM_COL}
+  ${C_YLW}-h${C_BLU}|${C_YLW}--help${C_RST}:      show this help information
+  ${C_YLW}-s${C_BLU}|${C_YLW}--version${C_RST}:   show version information
+  ${C_YLW}-n${C_BLU}|${C_YLW}--no-colors${C_RST}: disable color output
+  ${C_YLW}-f${C_BLU}|${C_YLW}--force${C_RST}:     disable yes/no prompts
 
-  ${WARN_COL}restore${NORM_COL}:
-    ${EMPH_COL}aliases${NORM_COL}: ${WARN_COL}rs${NORM_COL}, ${WARN_COL}res${NORM_COL}, ${WARN_COL}restore${NORM_COL}
-    ${EMPH_COL}desc${NORM_COL}:    restore file(s) from ${ERRO_COL}\$STORE_DIR${NORM_COL} (args either with or without
-             ${ERRO_COL}\$STORE_DIR${NORM_COL} prefix)
+${C_GRN}Subcommands:${C_RST}
 
-  ${WARN_COL}delete${NORM_COL}:
-    ${EMPH_COL}alias${NORM_COL}:   ${WARN_COL}dl${NORM_COL}, ${WARN_COL}del${NORM_COL}, ${WARN_COL}delte${NORM_COL}
-    ${EMPH_COL}desc${NORM_COL}:    delete files from ${ERRO_COL}\$STORE_DIR${NORM_COL}
+  ${C_YLW}remove${C_RST}:
+    ${C_BLU}aliases${C_RST}: ${C_YLW}rm${C_RST}, ${C_YLW}rem${C_RST}, ${C_YLW}remove${C_RST}
+    ${C_BLU}desc${C_RST}:    moves specified file(s) to ${C_RED}\$STORE_DIR${C_RST}
 
-  ${WARN_COL}search${NORM_COL}:
-    ${EMPH_COL}aliases${NORM_COL}: ${WARN_COL}sr${NORM_COL}, ${WARN_COL}sear${NORM_COL}, ${WARN_COL}search${NORM_COL}
-    ${EMPH_COL}desc${NORM_COL}:    search files added to ${ERRO_COL}\$STORE_DIR${NORM_COL}, grep expressions as optional
+  ${C_YLW}restore${C_RST}:
+    ${C_BLU}aliases${C_RST}: ${C_YLW}rs${C_RST}, ${C_YLW}res${C_RST}, ${C_YLW}restore${C_RST}
+    ${C_BLU}desc${C_RST}:    restore file(s) from ${C_RED}\$STORE_DIR${C_RST} (args either with or without
+             ${C_RED}\$STORE_DIR${C_RST} prefix)
+
+  ${C_YLW}delete${C_RST}:
+    ${C_BLU}alias${C_RST}:   ${C_YLW}dl${C_RST}, ${C_YLW}del${C_RST}, ${C_YLW}delte${C_RST}
+    ${C_BLU}desc${C_RST}:    delete files from ${C_RED}\$STORE_DIR${C_RST}
+
+  ${C_YLW}search${C_RST}:
+    ${C_BLU}aliases${C_RST}: ${C_YLW}sr${C_RST}, ${C_YLW}sear${C_RST}, ${C_YLW}search${C_RST}
+    ${C_BLU}desc${C_RST}:    search files added to ${C_RED}\$STORE_DIR${C_RST}, grep expressions as optional
              args
 
-  ${WARN_COL}research${NORM_COL}:
-    ${EMPH_COL}aliases${NORM_COL}: ${WARN_COL}rr${NORM_COL}, ${WARN_COL}resear${NORM_COL}, ${WARN_COL}rrch${NORM_COL}
-    ${EMPH_COL}desc${NORM_COL}:    restore via search, file(s) from ${ERRO_COL}\$STORE_DIR${NORM_COL} (args either with or
-             without ${ERRO_COL}\$STORE_DIR${NORM_COL} prefix)
+  ${C_YLW}research${C_RST}:
+    ${C_BLU}aliases${C_RST}: ${C_YLW}rr${C_RST}, ${C_YLW}resear${C_RST}, ${C_YLW}rrch${C_RST}
+    ${C_BLU}desc${C_RST}:    restore via search, file(s) from ${C_RED}\$STORE_DIR${C_RST} (args either with or
+             without ${C_RED}\$STORE_DIR${C_RST} prefix)
 
-  ${WARN_COL}clean${NORM_COL}:
-    ${EMPH_COL}aliases${NORM_COL}: ${WARN_COL}cl${NORM_COL}, ${WARN_COL}cln${NORM_COL}, ${WARN_COL}clean${NORM_COL}
-    ${EMPH_COL}desc${NORM_COL}:    empty ${ERRO_COL}\$STORE_DIR${NORM_COL}, you will be prompted for assurance
+  ${C_YLW}clean${C_RST}:
+    ${C_BLU}aliases${C_RST}: ${C_YLW}cl${C_RST}, ${C_YLW}cln${C_RST}, ${C_YLW}clean${C_RST}
+    ${C_BLU}desc${C_RST}:    empty ${C_RED}\$STORE_DIR${C_RST}, you will be prompted for assurance
+
+  ${C_YLW}restore-last${C_RST}:
+    ${C_BLU}aliases${C_RST}: ${C_YLW}last${C_RST}
+    ${C_BLU}desc${C_RST}:    restore last file in ${C_RED}\$HISTORY_FILE${C_RST}
 
 EOF
 }
@@ -325,7 +323,7 @@ func_version() {
 
 func_VERSION() {
   cat << EOF >> /dev/stdout
-Copyright © 2019 Benjamin Carrington
+Copyright © 2021 Benjamin Carrington
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -346,23 +344,16 @@ EOF
 
 ################## MAIN ##################
 
-_no_color() {
-  ERRO_COL=''
-  SUCC_COL=''
-  WARN_COL=''
-  EMPH_COL=''
-}
-
-_done_check() {
-  [[ -z "$1" && -z "$2" ]] && echo 1
-}
-
 main() {
   trap _sig_recv SIGINT
 
   _init__validate_software "grep" "base64" "rm"
   _init__runtime_vars
-  _init__decode_list
+  _init__read_list
+
+  _done_check() {
+    [[ -z "$1" && -z "$2" ]] && echo 1
+  }
 
   argv=()
   cmd=""
@@ -374,8 +365,7 @@ main() {
       --) arg_end=1 ;;
       -*)
         case "$1" in
-          --hist?(ory))     [[ -z "$arg_end" ]] && REM_HISTORY=1   || argv+=("$1") ;;
-          -p | --no-prompt) [[ -z "$arg_end" ]] && REM_NO_PROMPT=1 || argv+=("$1") ;;
+          -f | --force)     [[ -z "$arg_end" ]] && REM_NO_PROMPT=1 || argv+=("$1") ;;
           -n | --no-color)  [[ -z "$arg_end" ]] && _no_color       || argv+=("$1") ;;
           -h)               [[ -n "$CHECK" ]]   && cmd="help"      || argv+=("$1") ;;
           -H | --help)      [[ -n "$CHECK" ]]   && cmd="HELP"      || argv+=("$1") ;;

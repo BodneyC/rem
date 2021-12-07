@@ -12,33 +12,52 @@ At runtime, the contents of this location are taken and decoded and a list of th
 
 ## Usage
 
-There are five subcommands (so `rem <subcom>`):
+There are six subcommands (so `rem {subcommand}`):
 
 - `remove`: Moves the given file to the storage location
 - `delete`: Which deletes files in the storage location
 - `restore`: Which restores files from the storage location
 - `search`: List files in the storage location matching a `grep` pattern
-- `research`: This first performs a search and if any results are found, restores them
+- `research` (`res`tore via `search`): This first performs a search and if any results are found, restores them
 - `clean`: Empty the storage location
+- `last`: Will restore the last file `remove`ed with the `--history` flag
 
-`search` can be useful when `delete`ing to save writing full paths, eg:
+`search` can be useful when `r`e`s`toring to save writing full paths, eg:
 
-    $ rem dl $(rem sr "myfile")
+    $ rem rs $(rem sr "myfile")
 
 alternatively, `rem research` can be used
 
     $ rem rr "myfile"
 
-this will `[yn]` prompt you, if you don't want this, pass `-p` for "no prompt".
+this will `[yn]` prompt you, if you don't want this, pass `-f` for "force".
 
 Nothing more to it really.
+
+### History and Remove
+
+I've found several UIs that offer a way to delete a file, mostly through the use of `rm` - I wanted some way to use `rem`.
+
+This is usually easy enough but if you restart the UI there's no need to undo previously remmed files
 
 ### CLI
 
 ```txt
-Rem usage:
+Rem, a simple recycle bin script; usage:
 
-    rem [(--help|--version)] (remove|restore|delete|clean|search) [<args>]
+    rem [(--help|--version|--no-colors|--force|--history)]
+        (remove|restore|research|delete|clean|search)
+        [<args>]
+
+Options:
+
+  -h|--help:        show this help information
+  -s|--version:     show version information
+  -n|--no-colors:   disable color output
+  -f|--force:       disable yes/no prompts
+  --hist|--history: store the removed item in history
+
+Subcommands:
 
   remove:
     aliases: rm, rem, remove
@@ -46,7 +65,8 @@ Rem usage:
 
   restore:
     aliases: rs, res, restore
-    desc:    restore file(s) from $STORE_DIR (args either with or with $STORE_DIR prefix)
+    desc:    restore file(s) from $STORE_DIR (args either with or without
+             $STORE_DIR prefix)
 
   delete:
     alias:   dl, del, delte
@@ -54,12 +74,12 @@ Rem usage:
 
   search:
     aliases: sr, sear, search
-    desc:    search files added to \$STORE_DIR, grep expressions as optional args
+    desc:    search files added to $STORE_DIR, grep expressions as optional args
 
   research:
     aliases: rr, resear, rrch
-    desc:    restore via search, file(s) from \$STORE_DIR (args either with or
-             without \$STORE_DIR prefix)
+    desc:    restore via search, file(s) from $STORE_DIR (args either with or
+             without $STORE_DIR prefix)
 
   clean:
     aliases: cl, cln, clean
