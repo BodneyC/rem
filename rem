@@ -15,6 +15,7 @@ _no_color() {
   C_GRN=''
   C_YLW=''
   C_BLU=''
+  C_RST=''
 }
 
 shopt -s extglob
@@ -27,6 +28,8 @@ EARGS=4
 declare STORE_DIR LIST
 declare -A B # BINARIES
 
+REM_MAX_REMOVE="${REM_MAX_REMOVE:-20}"
+
 IS_LNX="$([[ "$(uname -s)" =~ Linux ]] && echo 1)"
 
 ################## INIT ##################
@@ -37,7 +40,7 @@ _init__runtime_vars() {
     STORE_DIR="$HOME/.recycle"
     mkdir -p "$STORE_DIR"
   else
-    STORE_DIR="$(realpath "$STORE_DIR")"
+    STORE_DIR="$("${B[realpath]}" "$STORE_DIR")"
     if [[ ! -d "$STORE_DIR" ]]; then
       _msg_ext "STORE_DIR: $STORE_DIR does not exist" $EFILE
     fi
@@ -98,28 +101,28 @@ _core_no_args() {
 ################## LIST ##################
 
 _check_in_list() {
-  ${B["grep"]} -q -e "^$(realpath "$1")$" <<< "$LIST"
+  ${B[grep]} -q -e "^$("${B[realpath]}" "$1")$" <<< "$LIST"
 }
 
 _remove_from_list() {
-  LIST=$(${B["grep"]} -v -e "^$1$" <<< "$LIST")
+  LIST=$(${B[grep]} -v -e "^$1$" <<< "$LIST")
 }
 
 _add_to_list() {
   if ! _check_in_list "$1"; then
     if [[ -z "$LIST" ]]; then
-      LIST="$(realpath "$1")"
+      LIST="$("${B[realpath]}" "$1")"
     else
-      LIST="$LIST\n$(realpath "$1")"
+      LIST="$LIST\n$("${B[realpath]}" "$1")"
     fi
   fi
 }
 
 _b64_filename() {
   if [[ -n "$IS_LNX" ]]; then
-    ${B["base64"]} --wrap 0 <<< "$(realpath "$1")"
+    ${B[base64]} --wrap 0 <<< "$("${B[realpath]}" "$1")"
   else
-    ${B["base64"]} <<< "$(realpath "$1")"
+    ${B[base64]} <<< "$("${B[realpath]}" "$1")"
   fi
 }
 
@@ -171,11 +174,11 @@ func_restore() {
         continue
       fi
     fi
-    _remove_from_list "$f"
+    _remove_from_list "$("${B[realpath]}" "$f")"
     if [[ -d "$f" ]]; then
       _msg_inf "%s" "$C_YLW\"$f\" already exists as a directory"
       if _yes_or_no "  delete existing \"$f\""; then
-        ${B["rm"]} -rf -- "$f"
+        ${B[rm]} -rf -- "$f"
       else
         continue
       fi
@@ -204,19 +207,19 @@ func_delete() {
         continue
       fi
     else
-      _remove_from_list "$f"
+      _remove_from_list "$("${B[realpath]}" "$f")"
       file="$STORE_DIR/$(_b64_filename "$f")"
     fi
-    ${B["rm"]} -rf -- "$file"
+    ${B[rm]} -rf -- "$file"
   done
   _write_history_file
 }
 
 func_remove() {
   _core_no_args "$@"
-  if [[ "$#" -gt 19 ]] \
+  if [[ "$#" -gt "$(( REM_MAX_REMOVE - 1 ))" ]] \
     && _yes_or_no "Twenty or more files, would you prefer to delete them"; then
-    ${B["rm"]} -rf -- "$@"
+    ${B[rm]} -rf -- "$@"
     return
   fi
   for f in "$@"; do
@@ -227,7 +230,7 @@ func_remove() {
     fi
     if [[ -e "$f" || -L "$f" ]]; then
       TO_FILE="$STORE_DIR/$(_b64_filename "$f")"
-      [[ -d "$f" ]] && ${B["rm"]} -rf -- "$TO_FILE"
+      [[ -d "$f" ]] && ${B[rm]} -rf -- "$TO_FILE"
       _add_to_list "$f"
       mv "$f" "$TO_FILE"
     else
@@ -240,11 +243,11 @@ func_remove() {
 func_search() {
   T="$LIST"
   for t in "$@"; do
-    T=$(${B["grep"]} -e "$t" <<< "$T")
+    T=$(${B[grep]} -e "$t" <<< "$T")
   done
   if [[ -z "$T" ]]; then
     if [[ -z $1 ]]; then
-      T="Recyle bin empty [$USER]"
+      T="Recycle bin empty [$USER]"
     else
       T="No results [$USER]"
     fi
@@ -254,7 +257,7 @@ func_search() {
 
 func_clean() {
   ! _yes_or_no "Are you sure" && _msg_ext "Clean aborted" $EPROG
-  { ${B["rm"]} -rf -- "$STORE_DIR" && mkdir -p "$STORE_DIR"; } \
+  { ${B[rm]} -rf -- "$STORE_DIR" && mkdir -p "$STORE_DIR"; } \
     || _msg_ext "Could not remove $STORE_DIR" $EPROG
 }
 
@@ -347,7 +350,7 @@ EOF
 main() {
   trap _sig_recv SIGINT
 
-  _init__validate_software "grep" "base64" "rm"
+  _init__validate_software "realpath" "grep" "base64" "rm"
   _init__runtime_vars
   _init__read_list
 
