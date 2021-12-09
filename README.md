@@ -73,16 +73,17 @@ Nothing more to it really.
 ```txt
 Rem, a simple recycle bin script; usage:
 
-    rem [(--help|--version|--no-colors|--force)]
+    rem [(--help|--version|--no-colors|--force|--quiet)]
         (remove|restore|research|delete|clean|search)
         [<args>]
 
 Options:
 
-  -h|--help:        show this help information
-  -s|--version:     show version information
-  -n|--no-colors:   disable color output
-  -f|--force:       disable yes/no prompts
+  -h|--help:      show this help information
+  -s|--version:   show version information
+  -n|--no-colors: disable color output
+  -f|--force:     disable yes/no prompts
+  -q|--quiet:     disable prompts and output
 
 Subcommands:
 

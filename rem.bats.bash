@@ -31,6 +31,20 @@ teardown() {
   assert_output "Recycle bin empty [$USER]"
 }
 
+########################## Flags ###########################
+
+@test "Quiet:    flag suppresses output" {
+  run ./rem search -q
+  assert_success
+  assert_output ""
+}
+
+@test "Quiet:    flag suppresses output" {
+  run ./rem search -q
+  assert_success
+  assert_output ""
+}
+
 ########################### REMOVE ##########################
 
 @test "Remove:   files to store dir" {
