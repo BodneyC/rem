@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-__REM_VERSION=1.2.1
+__REM_VERSION=1.2.2
 
 if command -v tput &> /dev/null && [[ -z "$NO_COLOR" ]]; then
   C_RED=$(tput setaf 1)
