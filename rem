@@ -275,7 +275,7 @@ func_clean() {
 ################## MISC ##################
 
 func_help() {
-  echo "rem [--help] (remove|restore|delete|clean|search) [<args>]"
+  _msg_inf "%s\n" "rem [--help] (remove|restore|delete|clean|search) [<args>]"
 }
 
 #readable_code
@@ -334,7 +334,7 @@ EOF
 }
 
 func_version() {
-  echo "Rem: $__REM_VERSION"
+  _msg_inf "%s\n" "Rem: $__REM_VERSION"
 }
 
 func_VERSION() {
@@ -372,24 +372,35 @@ main() {
   }
 
   argv=()
-  cmd=""
-  arg_end=""
+  cmd=
+  arg_end=
   [[ $# == 0 ]] && cmd="help"
   while [[ -n "$1" ]]; do
     CHECK=$(_done_check "$cmd" "$arg_end")
     case "$1" in
       --) arg_end=1 ;;
       -*)
-        case "$1" in
-          -f | --force)     [[ -z "$arg_end" ]] && REM_NO_PROMPT=1 || argv+=("$1") ;;
-          -q | --quiet)     [[ -z "$arg_end" ]] && REM_QUIET=1     || argv+=("$1") ;;
-          -n | --no-color)  [[ -z "$arg_end" ]] && _no_color       || argv+=("$1") ;;
-          -h)               [[ -n "$CHECK" ]]   && cmd="help"      || argv+=("$1") ;;
-          -H | --help)      [[ -n "$CHECK" ]]   && cmd="HELP"      || argv+=("$1") ;;
-          -v)               [[ -n "$CHECK" ]]   && cmd="version"   || argv+=("$1") ;;
-          -V | --version)   [[ -n "$CHECK" ]]   && cmd="VERSION"   || argv+=("$1") ;;
-          *)                [[ -n "$CHECK" ]]   && _msg_ext "Unknown option: $1" $EOPTN || argv+=("$1") ;;
-        esac
+        [[ -n "$arg_end" ]] && {
+          argv+=("$1")
+          break
+        }
+        break_after_one=true
+        [[ "${1:1:1}" != '-' ]] && break_after_one=false
+        for ((i = 1; i < "${#1}"; i++)); do
+          _arg="${1:$i:1}"
+          [[ "$break_after_one" == true ]] && _arg="${1:2}"
+          case "$_arg" in
+            f | -force)     [[ -z "$arg_end" ]] && REM_NO_PROMPT=1 || argv+=("$1") ;;
+            q | -quiet)     [[ -z "$arg_end" ]] && REM_QUIET=1     || argv+=("$1") ;;
+            n | -no-color)  [[ -z "$arg_end" ]] && _no_color       || argv+=("$1") ;;
+            h)              [[ -n "$CHECK" ]]   && cmd="help"      || argv+=("$1") ;;
+            H | -help)      [[ -n "$CHECK" ]]   && cmd="HELP"      || argv+=("$1") ;;
+            v)              [[ -n "$CHECK" ]]   && cmd="version"   || argv+=("$1") ;;
+            V | -version)   [[ -n "$CHECK" ]]   && cmd="VERSION"   || argv+=("$1") ;;
+            *)              [[ -n "$CHECK" ]]   && _msg_ext "Unknown option: $1" $EOPTN || argv+=("$1") ;;
+          esac
+          [[ "$break_after_one" == true ]] && break
+        done
         ;;
       d?(e)l?(ete))    [[ -n "$CHECK" ]] && cmd="delete"   || argv+=("$1") ;;
       r?(e)m?(ove))    [[ -n "$CHECK" ]] && cmd="remove"   || argv+=("$1") ;;
@@ -411,6 +422,8 @@ main() {
   "func_$cmd" "${argv[@]}"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
 
 # vim: sw=2 ts=2

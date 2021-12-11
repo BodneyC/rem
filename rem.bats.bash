@@ -23,6 +23,20 @@ teardown() {
   fi
 }
 
+########################## FLAGS ###########################
+
+@test "Flags:    should take multiple args as one" {
+  source ./rem
+
+  run ./rem -v
+  assert_success
+  assert_output "Rem: $__REM_VERSION"
+
+  run ./rem -qv
+  assert_success
+  assert_output ""
+}
+
 ########################## SEARCH ###########################
 
 @test "Search:   nothing in store dir" {
