@@ -61,7 +61,7 @@ _init__validate_software() {
 }
 
 _init__read_list() {
-  LIST="$(<"$HISTORY_FILE")"
+  LIST="$(< "$HISTORY_FILE")"
 }
 
 ################## LIB ###################
@@ -75,7 +75,7 @@ _msg_ext() {
 
 _msg_prompt() {
   [[ "$REM_QUIET" == 1 ]] && return
-  [[ "$REM_NO_PROMPT" == 1 ]] && return
+  [[ "$REM_AUTO_YES" == 1 ]] && return
   printf "$@"
 }
 
@@ -89,8 +89,11 @@ _sig_recv() {
 }
 
 _yes_or_no() { # Defaults to 'y' if quietened
-  if [[ "$REM_QUIET" == 1 ]] || [[ "$REM_NO_PROMPT" == 1 ]]; then
+  if [[ "$REM_AUTO_YES" == 1 ]]; then
     return
+  fi
+  if [[ "$REM_QUIET" == 1 ]]; then
+    return 1
   fi
   while read -rp "${C_YLW}$1?${C_RST} [yn] "; do
     case "$REPLY" in
@@ -169,7 +172,7 @@ func_last() {
     _msg_ext "No last file in history" $EOPTN
   fi
   _msg_inf "%s\n" "${C_YLW}Restore:${C_RST} $_last"
-  func_restore "$_last"
+  REM_LAST=1 func_restore "$_last"
 }
 
 func_restore() {
@@ -185,8 +188,10 @@ func_restore() {
         continue
       fi
     fi
-    _remove_from_list "$("${B[realpath]}" "$f")"
     if [[ -d "$f" ]]; then
+      if [[ "$REM_LAST" == 1 ]] && [[ "$REM_QUIET" == 1 ]] && [[ -z "$REM_AUTO_YES" ]]; then
+        return $EFILE
+      fi
       _msg_prompt "%s\"%s\" already exists as a directory%s\n" "$C_YLW" "$f" "$C_RST"
       if _yes_or_no "  delete existing \"$f\""; then
         ${B[rm]} -rf -- "$f"
@@ -195,6 +200,7 @@ func_restore() {
       fi
     fi
     mv "$STORE_DIR/$(_b64_filename "$f")" "$f"
+    _remove_from_list "$("${B[realpath]}" "$f")"
   done
   _write_history_file
 }
@@ -228,7 +234,7 @@ func_delete() {
 
 func_remove() {
   _core_no_args "$@"
-  if [[ "$#" -gt "$(( REM_MAX_REMOVE - 1 ))" ]] \
+  if [[ "$#" -gt "$((REM_MAX_REMOVE - 1))" ]] \
     && _yes_or_no "Twenty or more files, would you prefer to delete them"; then
     ${B[rm]} -rf -- "$@"
     return
@@ -284,7 +290,7 @@ func_HELP() {
 
 ${C_GRN}Rem, a simple recycle bin script; usage:$C_RST
 
-    ${C_YLW}rem ${C_RED}[${C_BLU}(${C_YLW}--help${C_BLU}|${C_YLW}--version${C_BLU}|${C_YLW}--no-colors${C_BLU}|${C_YLW}--quiet${C_BLU}|${C_YLW}--force${C_BLU})${C_RED}] ${C_RST}\\
+    ${C_YLW}rem ${C_RED}[${C_BLU}(${C_YLW}--help${C_BLU}|${C_YLW}--version${C_BLU}|${C_YLW}--no-colors${C_BLU}|${C_YLW}--quiet${C_BLU}|${C_YLW}--yes${C_BLU})${C_RED}] ${C_RST}\\
         ${C_BLU}(${C_YLW}remove${C_BLU}|${C_YLW}restore${C_BLU}|${C_YLW}research\
 ${C_BLU}|${C_YLW}delete${C_BLU}|${C_YLW}clean${C_BLU}|${C_YLW}search${C_BLU}|${C_YLW}last${C_BLU}) ${C_RST}\\
         ${C_RED}[${C_BLU}<${C_YLW}args${C_BLU}>${C_RED}]${C_RST}
@@ -294,8 +300,8 @@ ${C_GRN}Options:${C_RST}
   ${C_YLW}-h${C_BLU}|${C_YLW}--help${C_RST}:      show this help information
   ${C_YLW}-s${C_BLU}|${C_YLW}--version${C_RST}:   show version information
   ${C_YLW}-n${C_BLU}|${C_YLW}--no-colors${C_RST}: disable color output
-  ${C_YLW}-f${C_BLU}|${C_YLW}--force${C_RST}:     disable yes/no prompts
-  ${C_YLW}-q${C_BLU}|${C_YLW}--quiet${C_RST}:     disable prompts and output
+  ${C_YLW}-y${C_BLU}|${C_YLW}--yes${C_RST}:       disable prompts with 'yes'
+  ${C_YLW}-q${C_BLU}|${C_YLW}--quiet${C_RST}:     disable prompts and output (with 'no')
 
 ${C_GRN}Subcommands:${C_RST}
 
@@ -390,25 +396,25 @@ main() {
           _arg="${1:$i:1}"
           [[ "$break_after_one" == true ]] && _arg="${1:2}"
           case "$_arg" in
-            f | -force)     [[ -z "$arg_end" ]] && REM_NO_PROMPT=1 || argv+=("$1") ;;
-            q | -quiet)     [[ -z "$arg_end" ]] && REM_QUIET=1     || argv+=("$1") ;;
-            n | -no-color)  [[ -z "$arg_end" ]] && _no_color       || argv+=("$1") ;;
-            h)              [[ -n "$CHECK" ]]   && cmd="help"      || argv+=("$1") ;;
-            H | -help)      [[ -n "$CHECK" ]]   && cmd="HELP"      || argv+=("$1") ;;
-            v)              [[ -n "$CHECK" ]]   && cmd="version"   || argv+=("$1") ;;
-            V | -version)   [[ -n "$CHECK" ]]   && cmd="VERSION"   || argv+=("$1") ;;
-            *)              [[ -n "$CHECK" ]]   && _msg_ext "Unknown option: $1" $EOPTN || argv+=("$1") ;;
+            y | -yes) [[ -z "$arg_end" ]] && REM_AUTO_YES=1 || argv+=("$1") ;;
+            q | -quiet) [[ -z "$arg_end" ]] && REM_QUIET=1 || argv+=("$1") ;;
+            n | -no-color) [[ -z "$arg_end" ]] && _no_color || argv+=("$1") ;;
+            h) [[ -n "$CHECK" ]] && cmd="help" || argv+=("$1") ;;
+            H | -help) [[ -n "$CHECK" ]] && cmd="HELP" || argv+=("$1") ;;
+            v) [[ -n "$CHECK" ]] && cmd="version" || argv+=("$1") ;;
+            V | -version) [[ -n "$CHECK" ]] && cmd="VERSION" || argv+=("$1") ;;
+            *) [[ -n "$CHECK" ]] && _msg_ext "Unknown option: $1" $EOPTN || argv+=("$1") ;;
           esac
           [[ "$break_after_one" == true ]] && break
         done
         ;;
-      d?(e)l?(ete))    [[ -n "$CHECK" ]] && cmd="delete"   || argv+=("$1") ;;
-      r?(e)m?(ove))    [[ -n "$CHECK" ]] && cmd="remove"   || argv+=("$1") ;;
-      r?(e)s?(tore))   [[ -n "$CHECK" ]] && cmd="restore"  || argv+=("$1") ;;
-      r?(esea)r?(ch))  [[ -n "$CHECK" ]] && cmd="research" || argv+=("$1") ;;
-      cl?(ea)?(n))     [[ -n "$CHECK" ]] && cmd="clean"    || argv+=("$1") ;;
-      s?(ea)r?(ch))    [[ -n "$CHECK" ]] && cmd="search"   || argv+=("$1") ;;
-      ?(restore-)last) [[ -n "$CHECK" ]] && cmd="last"     || argv+=("$1") ;;
+      d?(e)l?(ete)) [[ -n "$CHECK" ]] && cmd="delete" || argv+=("$1") ;;
+      r?(e)m?(ove)) [[ -n "$CHECK" ]] && cmd="remove" || argv+=("$1") ;;
+      r?(e)s?(tore)) [[ -n "$CHECK" ]] && cmd="restore" || argv+=("$1") ;;
+      r?(esea)r?(ch)) [[ -n "$CHECK" ]] && cmd="research" || argv+=("$1") ;;
+      cl?(ea)?(n)) [[ -n "$CHECK" ]] && cmd="clean" || argv+=("$1") ;;
+      s?(ea)r?(ch)) [[ -n "$CHECK" ]] && cmd="search" || argv+=("$1") ;;
+      ?(restore-)last) [[ -n "$CHECK" ]] && cmd="last" || argv+=("$1") ;;
       *) argv+=("$1") ;;
     esac
     shift
@@ -423,7 +429,7 @@ main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    main "$@"
+  main "$@"
 fi
 
 # vim: sw=2 ts=2

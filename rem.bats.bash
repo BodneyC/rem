@@ -65,12 +65,9 @@ teardown() {
   run ./rem "$FILES_DIR/"{a,b}
   assert_success
 
-  run test -f "$FILES_DIR/a"
-  assert_failure
-  run test -f "$FILES_DIR/b"
-  assert_failure
-  run test -f "$FILES_DIR/c"
-  assert_success
+  refute [ -f "$FILES_DIR/a" ]
+  refute [ -f "$FILES_DIR/b" ]
+  assert [ -f "$FILES_DIR/c" ]
 }
 
 @test "Remove:   files show up in search" {
@@ -110,8 +107,7 @@ teardown() {
   run ./rem restore "$FILES_DIR/a"
   assert_success
 
-  run test -f "$FILES_DIR/a"
-  assert_success
+  assert [ -f "$FILES_DIR/a" ]
 }
 
 @test "Restore:  files removed from search" {
@@ -136,8 +132,7 @@ teardown() {
   yes | run ./rem research "$_rnd"
   assert_success
 
-  run test -f "$FILES_DIR/z-$_rnd"
-  assert_success
+  assert [ -f "$FILES_DIR/z-$_rnd" ]
 
   run ./rem search
   assert_output "$PWD/$FILES_DIR/a"
@@ -149,23 +144,20 @@ teardown() {
   yes | run ./rem dl "$FILES_DIR/a"
   assert_success
 
-  run test -f "$FILES_DIR/a"
-  assert_failure
+  refute [ -f "$FILES_DIR/a" ]
 }
 
 @test "Delete:   file outside STORE_DIR with force" {
-  run ./rem dl -f "$FILES_DIR/a"
+  run ./rem dl -y "$FILES_DIR/a"
   assert_success
 
-  run test -f "$FILES_DIR/a"
-  assert_failure
+  refute [ -f "$FILES_DIR/a" ]
 }
 
 @test "Delete:   file within STORE_DIR" {
   run ./rem "$FILES_DIR/a"
   assert_success
-  run test -f "$FILES_DIR/a"
-  assert_failure
+  refute [ -f "$FILES_DIR/a" ]
 
   run ./rem dl "$FILES_DIR/a"
   assert_success
@@ -189,16 +181,54 @@ teardown() {
 
   run ./rem last
   assert_success
-  run test -f "$FILES_DIR/c"
-  assert_success
+  assert [ -f "$FILES_DIR/c" ]
 
   run ./rem last
   assert_success
-  run test -f "$FILES_DIR/b"
+
+  assert [ -f "$FILES_DIR/b" ]
+  refute [ -f "$FILES_DIR/a" ]
+}
+
+@test "Last:     shouldn't restore directory with -q" {
+  mkdir "$FILES_DIR/some_dir"
+  touch "$FILES_DIR/some_dir/a"
+
+  run ./rem "$FILES_DIR/some_dir"
   assert_success
 
-  run test -f "$FILES_DIR/a"
-  assert_failure
+  mkdir "$FILES_DIR/some_dir"
+  touch "$FILES_DIR/some_dir/b"
+
+  run ./rem -q last
+  assert_failure 3 # $EFILE
+
+  refute [ -f "$FILES_DIR/some_dir/a" ]
+  assert [ -f "$FILES_DIR/some_dir/b" ]
+
+  run ./rem search
+  echo -e "$PWD/$FILES_DIR/some_dir" | assert_output
+}
+
+@test "Last:     should restore directory with -qy" {
+  mkdir "$FILES_DIR/some_dir"
+  touch "$FILES_DIR/some_dir/a"
+
+  run ./rem "$FILES_DIR/some_dir"
+  assert_success
+
+  mkdir "$FILES_DIR/some_dir"
+  touch "$FILES_DIR/some_dir/b"
+
+  run ./rem -qy last
+  assert_success
+
+  assert [ -f "$FILES_DIR/some_dir/a" ]
+  refute [ -f "$FILES_DIR/some_dir/b" ]
+
+  run ./rem search
+  assert_success
+  assert_output "Recycle bin empty [$USER]"
 }
 
 ########################### CLEAN ###########################

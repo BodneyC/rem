@@ -82,8 +82,8 @@ Options:
   -h|--help:      show this help information
   -s|--version:   show version information
   -n|--no-colors: disable color output
-  -f|--force:     disable yes/no prompts
-  -q|--quiet:     disable prompts and output
+  -y|--yes:       disable prompts with 'yes'
+  -q|--quiet:     disable prompts and output (with 'no')
 
 Subcommands:
 
