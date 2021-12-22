@@ -73,7 +73,7 @@ Nothing more to it really.
 ```txt
 Rem, a simple recycle bin script; usage:
 
-    rem [(--help|--version|--no-colors|--force|--quiet)]
+    rem [(--help|--version|--no-colors|--yes|--quiet)]
         (remove|restore|research|delete|clean|search)
         [<args>]
 
