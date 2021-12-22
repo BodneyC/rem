@@ -64,7 +64,7 @@ alternatively, `rem research` can be used
 
     $ rem rr "myfile"
 
-this will `[yn]` prompt you, if you don't want this, pass `-f` for "force".
+this will `[yn]` prompt you, if you don't want this, pass `-y` to automatically select 'yes'.
 
 Nothing more to it really.
 
