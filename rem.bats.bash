@@ -172,7 +172,7 @@ teardown() {
 @test "Last:     with nothing remmed should error" {
   run ./rem -n last
   assert_failure
-  assert_output "No last file in history, exiting..."
+  assert_output "No last file in history"
 }
 
 @test "Last:     should restore iteratively" {

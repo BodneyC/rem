@@ -53,7 +53,7 @@ _init__runtime_vars() {
 
 _init__validate_software() {
   for s in "$@"; do
-    hash "$s" > /dev/null 2>&1 || _msg_ext "\"$s\" not found on \$PATH" $EPROG
+    hash "$s" > /dev/null 2>&1 || _msg_ext "'$s' not found on \$PATH" $EPROG
     B["$s"]="$(command -v "$s")"
     { [[ -z $IS_LNX ]] && hash "g$s" > /dev/null 2>&1; } \
       && B["$s"]="$(command -v "g$s")"
@@ -68,7 +68,7 @@ _init__read_list() {
 
 _msg_ext() {
   if [[ "$REM_QUIET" != 1 ]]; then
-    echo -e "${C_RED}$1, exiting...${C_RST}"
+    echo -e "${C_RED}$1${C_RST}"
   fi
   exit "$2"
 }
@@ -151,16 +151,17 @@ _write_history_file() {
 func_research() {
   _ifs="$IFS"
   IFS=$'\n'
+  # shellcheck disable=2207
   if _search=($(func_search "$@")); then
     if [[ "${#_search[@]}" == 1 ]] && [[ "${_search[0]}" =~ \[$USER\] ]]; then
-      _msg_inf "%s\n" "${_search[0]}"
+      _msg_inf "${_search[0]}\n"
       return
     fi
-    _msg_prompt "%sAbout to restore:%s\n" "$C_YLW" "$C_RST"
-    _msg_prompt "  %s\n" "${_search[@]}"
+    _msg_prompt "${C_YLW}About to restore:${C_RST}\n"
+    _msg_prompt "$(printf "  %s\n" "${_search[@]}")\n"
     if _yes_or_no "continue"; then
       func_restore "${_search[@]}"
-      _msg_inf "%s\n" "Files restored"
+      _msg_inf "Files restored\n"
     fi
   fi
   IFS="$_ifs"
@@ -171,7 +172,7 @@ func_last() {
   if [[ -z "$_last" ]]; then
     _msg_ext "No last file in history" $EOPTN
   fi
-  _msg_inf "%s\n" "${C_YLW}Restore:${C_RST} $_last"
+  _msg_inf "${C_YLW}Restored:${C_RST} $_last\n"
   REM_LAST=1 func_restore "$_last"
 }
 
@@ -184,7 +185,7 @@ func_restore() {
       if _check_in_list "$PWD/$f"; then
         f="$PWD/$f"
       else
-        echo "$C_YLW\"$f\" not found in $STORE_DIR, continuing...$C_RST"
+        echo "$C_YLW'$f' not found in $STORE_DIR, continuing...$C_RST"
         continue
       fi
     fi
@@ -192,8 +193,8 @@ func_restore() {
       if [[ "$REM_LAST" == 1 ]] && [[ "$REM_QUIET" == 1 ]] && [[ -z "$REM_AUTO_YES" ]]; then
         return $EFILE
       fi
-      _msg_prompt "%s\"%s\" already exists as a directory%s\n" "$C_YLW" "$f" "$C_RST"
-      if _yes_or_no "  delete existing \"$f\""; then
+      _msg_prompt "${C_YLW}'$f' already exists as a directory${C_RST}\n"
+      if _yes_or_no "  delete existing '$f'"; then
         ${B[rm]} -rf -- "$f"
       else
         continue
@@ -211,14 +212,14 @@ func_delete() {
     f=${f#"$STORE_DIR"}
     file=""
     if ! _check_in_list "$f"; then
-      _msg_prompt "%s\"%s\" not found in %s" "$C_YLW" "$f" "$STORE_DIR"
+      _msg_prompt "$C_YLW'$f' not found in $STORE_DIR"
       if [[ ! -e "$f" ]]; then
-        _msg_prompt " or relative%s\n" "$C_RST"
+        _msg_prompt " or relative$C_RST\n"
         continue
       else
-        _msg_prompt "%s\n" "$C_RST"
+        _msg_prompt "$C_RST\n"
       fi
-      if _yes_or_no "  delete \"$f\" permanently"; then
+      if _yes_or_no "  delete '$f' permanently"; then
         file="$f"
       else
         continue
@@ -242,7 +243,7 @@ func_remove() {
   for f in "$@"; do
     [[ -z "$f" ]] && continue
     if [[ "$f" == "$STORE_DIR"* ]]; then
-      _msg_inf "%s\n" "${C_YLW}Cannot remove file already in $STORE_DIR, continuing...$C_RST"
+      _msg_inf "${C_YLW}Cannot remove file already in $STORE_DIR, continuing...$C_RST\n"
       continue
     fi
     if [[ -e "$f" || -L "$f" ]]; then
@@ -251,7 +252,7 @@ func_remove() {
       _add_to_list "$f"
       mv "$f" "$TO_FILE"
     else
-      _msg_inf "%s\n" "${C_YLW}File \"$f\" does not exist, continuing...$C_RST"
+      _msg_inf "${C_YLW}File '$f' does not exist, continuing...$C_RST\n"
     fi
   done
   _write_history_file
@@ -269,7 +270,7 @@ func_search() {
       T="No results [$USER]"
     fi
   fi
-  _msg_inf "%s\n" "$T"
+  _msg_inf "$T\n"
 }
 
 func_clean() {
@@ -281,66 +282,72 @@ func_clean() {
 ################## MISC ##################
 
 func_help() {
-  _msg_inf "%s\n" "rem [--help] (remove|restore|delete|clean|search) [<args>]"
+  _msg_inf "rem [--help] (remove|restore|delete|clean|search) [<args>]\n"
 }
 
 #readable_code
 func_HELP() {
+  g=$C_GRN
+  y=$C_YLW
+  b=$C_BLU
+  r=$C_RED
+  s=$C_RST
   cat << EOF >> /dev/stdout
 
-${C_GRN}Rem, a simple recycle bin script; usage:$C_RST
+${g}Rem, a simple recycle bin script; usage:$s
 
-    ${C_YLW}rem ${C_RED}[${C_BLU}(${C_YLW}--help${C_BLU}|${C_YLW}--version${C_BLU}|${C_YLW}--no-colors${C_BLU}|${C_YLW}--quiet${C_BLU}|${C_YLW}--yes${C_BLU})${C_RED}] ${C_RST}\\
-        ${C_BLU}(${C_YLW}remove${C_BLU}|${C_YLW}restore${C_BLU}|${C_YLW}research\
-${C_BLU}|${C_YLW}delete${C_BLU}|${C_YLW}clean${C_BLU}|${C_YLW}search${C_BLU}|${C_YLW}last${C_BLU}) ${C_RST}\\
-        ${C_RED}[${C_BLU}<${C_YLW}args${C_BLU}>${C_RED}]${C_RST}
+    ${y}rem ${r}[${b}(${y}--help${b}|${y}--version${b}|${y}--no-colors${b}|${y}\
+--quiet${b}|${y}--yes${b})${r}] ${s}\\
+        ${b}(${y}remove${b}|${y}restore${b}|${y}research\
+${b}|${y}delete${b}|${y}clean${b}|${y}search${b}|${y}last${b}) ${s}\\
+        ${r}[${b}<${y}args${b}>${r}]${s}
 
-${C_GRN}Options:${C_RST}
+${g}Options:${s}
 
-  ${C_YLW}-h${C_BLU}|${C_YLW}--help${C_RST}:      show this help information
-  ${C_YLW}-s${C_BLU}|${C_YLW}--version${C_RST}:   show version information
-  ${C_YLW}-n${C_BLU}|${C_YLW}--no-colors${C_RST}: disable color output
-  ${C_YLW}-y${C_BLU}|${C_YLW}--yes${C_RST}:       disable prompts with 'yes'
-  ${C_YLW}-q${C_BLU}|${C_YLW}--quiet${C_RST}:     disable prompts and output (with 'no')
+  ${y}-h${b}|${y}--help${s}:      show this help information
+  ${y}-s${b}|${y}--version${s}:   show version information
+  ${y}-n${b}|${y}--no-colors${s}: disable color output
+  ${y}-y${b}|${y}--yes${s}:       disable prompts with 'yes'
+  ${y}-q${b}|${y}--quiet${s}:     disable prompts and output (with 'no')
 
-${C_GRN}Subcommands:${C_RST}
+${g}Subcommands:${s}
 
-  ${C_YLW}remove${C_RST}:
-    ${C_BLU}aliases${C_RST}: ${C_YLW}rm${C_RST}, ${C_YLW}rem${C_RST}, ${C_YLW}remove${C_RST}
-    ${C_BLU}desc${C_RST}:    moves specified file(s) to ${C_RED}\$STORE_DIR${C_RST}
+  ${y}remove${s}:
+    ${b}aliases${s}: ${y}rm${s}, ${y}rem${s}, ${y}remove${s}
+    ${b}desc${s}:    moves specified file(s) to ${r}\$STORE_DIR${s}
 
-  ${C_YLW}restore${C_RST}:
-    ${C_BLU}aliases${C_RST}: ${C_YLW}rs${C_RST}, ${C_YLW}res${C_RST}, ${C_YLW}restore${C_RST}
-    ${C_BLU}desc${C_RST}:    restore file(s) from ${C_RED}\$STORE_DIR${C_RST} (args either with or without
-             ${C_RED}\$STORE_DIR${C_RST} prefix)
+  ${y}restore${s}:
+    ${b}aliases${s}: ${y}rs${s}, ${y}res${s}, ${y}restore${s}
+    ${b}desc${s}:    restore file(s) from ${r}\$STORE_DIR${s} (args either with or without
+             ${r}\$STORE_DIR${s} prefix)
 
-  ${C_YLW}delete${C_RST}:
-    ${C_BLU}alias${C_RST}:   ${C_YLW}dl${C_RST}, ${C_YLW}del${C_RST}, ${C_YLW}delte${C_RST}
-    ${C_BLU}desc${C_RST}:    delete files from ${C_RED}\$STORE_DIR${C_RST}
+  ${y}delete${s}:
+    ${b}alias${s}:   ${y}dl${s}, ${y}del${s}, ${y}delte${s}
+    ${b}desc${s}:    delete files from ${r}\$STORE_DIR${s}
 
-  ${C_YLW}search${C_RST}:
-    ${C_BLU}aliases${C_RST}: ${C_YLW}sr${C_RST}, ${C_YLW}sear${C_RST}, ${C_YLW}search${C_RST}
-    ${C_BLU}desc${C_RST}:    search files added to ${C_RED}\$STORE_DIR${C_RST}, grep expressions as optional
+  ${y}search${s}:
+    ${b}aliases${s}: ${y}sr${s}, ${y}sear${s}, ${y}search${s}
+    ${b}desc${s}:    search files added to ${r}\$STORE_DIR${s}, grep expressions as optional
              args
 
-  ${C_YLW}research${C_RST}:
-    ${C_BLU}aliases${C_RST}: ${C_YLW}rr${C_RST}, ${C_YLW}resear${C_RST}, ${C_YLW}rrch${C_RST}
-    ${C_BLU}desc${C_RST}:    restore via search, file(s) from ${C_RED}\$STORE_DIR${C_RST} (args either with or
-             without ${C_RED}\$STORE_DIR${C_RST} prefix)
+  ${y}research${s}:
+    ${b}aliases${s}: ${y}rr${s}, ${y}resear${s}, ${y}rrch${s}
+    ${b}desc${s}:    restore via search, file(s) from ${r}\$STORE_DIR${s} (args either with or
+             without ${r}\$STORE_DIR${s} prefix)
 
-  ${C_YLW}clean${C_RST}:
-    ${C_BLU}aliases${C_RST}: ${C_YLW}cl${C_RST}, ${C_YLW}cln${C_RST}, ${C_YLW}clean${C_RST}
-    ${C_BLU}desc${C_RST}:    empty ${C_RED}\$STORE_DIR${C_RST}, you will be prompted for assurance
+  ${y}clean${s}:
+    ${b}aliases${s}: ${y}cl${s}, ${y}cln${s}, ${y}clean${s}
+    ${b}desc${s}:    empty ${r}\$STORE_DIR${s}, you will be prompted for assurance
 
-  ${C_YLW}restore-last${C_RST}:
-    ${C_BLU}aliases${C_RST}: ${C_YLW}last${C_RST}
-    ${C_BLU}desc${C_RST}:    restore last file in ${C_RED}\$HISTORY_FILE${C_RST}
+  ${y}restore-last${s}:
+    ${b}aliases${s}: ${y}last${s}
+    ${b}desc${s}:    restore last file in ${r}\$HISTORY_FILE${s}
 
 EOF
 }
 
 func_version() {
-  _msg_inf "%s\n" "Rem: $__REM_VERSION"
+  _msg_inf "Rem: $__REM_VERSION\n"
 }
 
 func_VERSION() {
@@ -402,14 +409,14 @@ main() {
           _arg="${1:$i:1}"
           [[ "$break_after_one" == true ]] && _arg="${1:2}"
           case "$_arg" in
-            y | yes)      [[ -z "$arg_end" ]] && REM_AUTO_YES=1 || argv+=("$1") ;;
-            q | quiet)    [[ -z "$arg_end" ]] && REM_QUIET=1    || argv+=("$1") ;;
-            n | no-color) [[ -z "$arg_end" ]] && _no_color      || argv+=("$1") ;;
-            h)            [[ -n "$CHECK" ]]   && cmd="help"     || argv+=("$1") ;;
-            H | help)     [[ -n "$CHECK" ]]   && cmd="HELP"     || argv+=("$1") ;;
-            v)            [[ -n "$CHECK" ]]   && cmd="version"  || argv+=("$1") ;;
-            V | version)  [[ -n "$CHECK" ]]   && cmd="VERSION"  || argv+=("$1") ;;
-            *)            [[ -n "$CHECK" ]]   && _msg_ext "Unknown option: $1" $EOPTN || argv+=("$1") ;;
+            y | yes) [[ -z "$arg_end" ]] && REM_AUTO_YES=1 || argv+=("$1") ;;
+            q | quiet) [[ -z "$arg_end" ]] && REM_QUIET=1 || argv+=("$1") ;;
+            n | no-color) [[ -z "$arg_end" ]] && _no_color || argv+=("$1") ;;
+            h) [[ -n "$CHECK" ]] && cmd="help" || argv+=("$1") ;;
+            H | help) [[ -n "$CHECK" ]] && cmd="HELP" || argv+=("$1") ;;
+            v) [[ -n "$CHECK" ]] && cmd="version" || argv+=("$1") ;;
+            V | version) [[ -n "$CHECK" ]] && cmd="VERSION" || argv+=("$1") ;;
+            *) [[ -n "$CHECK" ]] && _msg_ext "Unknown option: $1" $EOPTN || argv+=("$1") ;;
           esac
           [[ "$break_after_one" == true ]] && break
         done
