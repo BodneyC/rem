@@ -2,7 +2,7 @@
 
 __REM_VERSION=1.3.1
 
-if command -v tput &> /dev/null && [[ -z "$NO_COLOR" ]]; then
+if command -v tput &>/dev/null && [[ -z "$NO_COLOR" ]]; then
   C_RED=$(tput setaf 1)
   C_GRN=$(tput setaf 2)
   C_YLW=$(tput setaf 3)
@@ -17,8 +17,6 @@ _no_color() {
   C_BLU=''
   C_RST=''
 }
-
-shopt -s extglob
 
 EPROG=1
 EOPTN=2
@@ -53,15 +51,15 @@ _init__runtime_vars() {
 
 _init__validate_software() {
   for s in "$@"; do
-    hash "$s" > /dev/null 2>&1 || _msg_ext "'$s' not found on \$PATH" $EPROG
+    hash "$s" >/dev/null 2>&1 || _msg_ext "'$s' not found on \$PATH" $EPROG
     B["$s"]="$(command -v "$s")"
-    { [[ -z $IS_LNX ]] && hash "g$s" > /dev/null 2>&1; } \
-      && B["$s"]="$(command -v "g$s")"
+    { [[ -z $IS_LNX ]] && hash "g$s" >/dev/null 2>&1; } &&
+      B["$s"]="$(command -v "g$s")"
   done
 }
 
 _init__read_list() {
-  LIST="$(< "$HISTORY_FILE")"
+  LIST="$(<"$HISTORY_FILE")"
 }
 
 ################## LIB ###################
@@ -97,9 +95,9 @@ _yes_or_no() { # Defaults to 'y' if quietened
   fi
   while read -rp "${C_YLW}$1?${C_RST} [yn] "; do
     case "$REPLY" in
-      [yY]*) return 0 ;;
-      [nN]*) return 1 ;;
-      *) echo -e "$C_RED    invalid option ($REPLY)$C_RST" ;;
+    [yY]*) return 0 ;;
+    [nN]*) return 1 ;;
+    *) echo -e "$C_RED    invalid option ($REPLY)$C_RST" ;;
     esac
     echo -en "\e[1A\e[1A\e[2K"
   done
@@ -115,11 +113,11 @@ _core_no_args() {
 ################## LIST ##################
 
 _check_in_list() {
-  ${B[grep]} -q -e "^$("${B[realpath]}" "$1")$" <<< "$LIST"
+  ${B[grep]} -q -e "^$("${B[realpath]}" "$1")$" <<<"$LIST"
 }
 
 _remove_from_list() {
-  LIST=$(${B[grep]} -v -e "^$1$" <<< "$LIST")
+  LIST=$(${B[grep]} -v -e "^$1$" <<<"$LIST")
 }
 
 _add_to_list() {
@@ -134,16 +132,16 @@ _add_to_list() {
 
 _b64_filename() {
   if [[ -n "$IS_LNX" ]]; then
-    ${B[base64]} --wrap 0 <<< "$("${B[realpath]}" "$1")"
+    ${B[base64]} --wrap 0 <<<"$("${B[realpath]}" "$1")"
   else
-    ${B[base64]} <<< "$("${B[realpath]}" "$1")"
+    ${B[base64]} <<<"$("${B[realpath]}" "$1")"
   fi
 }
 
 ################## HISTORY ##################
 
 _write_history_file() {
-  echo -e "$LIST" > "$HISTORY_FILE"
+  echo -e "$LIST" >"$HISTORY_FILE"
 }
 
 ################## CORE ##################
@@ -168,9 +166,22 @@ func_research() {
 }
 
 func_last() {
-  _last="$(tail -1 "$HISTORY_FILE")"
+  local _dir="$1"
+  local _last
+  if [[ -n "$_dir" ]]; then
+    if [[ "$_dir" != */ ]]; then
+      _dir=$(dirname "$_dir")
+    fi
+    _last="$(tac "$HISTORY_FILE" | grep -m1 "^$1")"
+  else
+    _last="$(tail -1 "$HISTORY_FILE")"
+  fi
   if [[ -z "$_last" ]]; then
-    _msg_ext "No last file in history" $EOPTN
+    if [[ -n "$_dir" ]]; then
+      _msg_ext "No last file in '$_dir'" $EOPTN
+    else
+      _msg_ext "No last file in history" $EOPTN
+    fi
   fi
   _msg_inf "${C_YLW}Restored:${C_RST} $_last\n"
   REM_LAST=1 func_restore "$_last"
@@ -235,8 +246,8 @@ func_delete() {
 
 func_remove() {
   _core_no_args "$@"
-  if [[ "$#" -gt "$((REM_MAX_REMOVE - 1))" ]] \
-    && _yes_or_no "Twenty or more files, would you prefer to delete them"; then
+  if [[ "$#" -gt "$((REM_MAX_REMOVE - 1))" ]] &&
+    _yes_or_no "Twenty or more files, would you prefer to delete them"; then
     ${B[rm]} -rf -- "$@"
     return
   fi
@@ -261,7 +272,7 @@ func_remove() {
 func_search() {
   T="$LIST"
   for t in "$@"; do
-    T=$(${B[grep]} -e "$t" <<< "$T")
+    T=$(${B[grep]} -e "$t" <<<"$T")
   done
   if [[ -z "$T" ]]; then
     if [[ -z $1 ]]; then
@@ -275,8 +286,8 @@ func_search() {
 
 func_clean() {
   ! _yes_or_no "Are you sure" && _msg_ext "Clean aborted" $EPROG
-  { ${B[rm]} -rf -- "$STORE_DIR" && mkdir -p "$STORE_DIR"; } \
-    || _msg_ext "Could not remove $STORE_DIR" $EPROG
+  { ${B[rm]} -rf -- "$STORE_DIR" && mkdir -p "$STORE_DIR"; } ||
+    _msg_ext "Could not remove $STORE_DIR" $EPROG
 }
 
 ################## MISC ##################
@@ -292,7 +303,7 @@ func_HELP() {
   b=$C_BLU
   r=$C_RED
   s=$C_RST
-  cat << EOF >> /dev/stdout
+  cat <<EOF
 
 ${g}Rem, a simple recycle bin script; usage:$s
 
@@ -342,6 +353,7 @@ ${g}Subcommands:${s}
   ${y}restore-last${s}:
     ${b}aliases${s}: ${y}last${s}
     ${b}desc${s}:    restore last file in ${r}\$HISTORY_FILE${s}
+                     if a positional is given, restore the last file in that directory
 
 EOF
 }
@@ -351,7 +363,7 @@ func_version() {
 }
 
 func_VERSION() {
-  cat << EOF >> /dev/stdout
+  cat <<EOF >>/dev/stdout
 Copyright (c) 2019-2021 BodneyC
 
 Permission is hereby granted, free of charge, to any person obtaining
@@ -397,38 +409,38 @@ main() {
   while [[ -n "$1" ]]; do
     CHECK=$(_done_check "$cmd" "$arg_end")
     case "$1" in
-      --) arg_end=1 ;;
-      -*)
-        [[ -n "$arg_end" ]] && {
-          argv+=("$1")
-          break
-        }
-        break_after_one=true
-        [[ "${1:1:1}" != '-' ]] && break_after_one=false
-        for ((i = 1; i < "${#1}"; i++)); do
-          _arg="${1:$i:1}"
-          [[ "$break_after_one" == true ]] && _arg="${1:2}"
-          case "$_arg" in
-            y | yes) [[ -z "$arg_end" ]] && REM_AUTO_YES=1 || argv+=("$1") ;;
-            q | quiet) [[ -z "$arg_end" ]] && REM_QUIET=1 || argv+=("$1") ;;
-            n | no-color) [[ -z "$arg_end" ]] && _no_color || argv+=("$1") ;;
-            h) [[ -n "$CHECK" ]] && cmd="help" || argv+=("$1") ;;
-            H | help) [[ -n "$CHECK" ]] && cmd="HELP" || argv+=("$1") ;;
-            v) [[ -n "$CHECK" ]] && cmd="version" || argv+=("$1") ;;
-            V | version) [[ -n "$CHECK" ]] && cmd="VERSION" || argv+=("$1") ;;
-            *) [[ -n "$CHECK" ]] && _msg_ext "Unknown option: $1" $EOPTN || argv+=("$1") ;;
-          esac
-          [[ "$break_after_one" == true ]] && break
-        done
-        ;;
-      d?(e)l?(ete)) [[ -n "$CHECK" ]] && cmd="delete" || argv+=("$1") ;;
-      r?(e)m?(ove)) [[ -n "$CHECK" ]] && cmd="remove" || argv+=("$1") ;;
-      r?(e)s?(tore)) [[ -n "$CHECK" ]] && cmd="restore" || argv+=("$1") ;;
-      r?(esea)r?(ch)) [[ -n "$CHECK" ]] && cmd="research" || argv+=("$1") ;;
-      cl?(ea)?(n)) [[ -n "$CHECK" ]] && cmd="clean" || argv+=("$1") ;;
-      s?(ea)r?(ch)) [[ -n "$CHECK" ]] && cmd="search" || argv+=("$1") ;;
-      ?(restore-)last) [[ -n "$CHECK" ]] && cmd="last" || argv+=("$1") ;;
-      *) argv+=("$1") ;;
+    --) arg_end=1 ;;
+    -*)
+      [[ -n "$arg_end" ]] && {
+        argv+=("$1")
+        break
+      }
+      break_after_one=true
+      [[ "${1:1:1}" != '-' ]] && break_after_one=false
+      for ((i = 1; i < "${#1}"; i++)); do
+        _arg="${1:$i:1}"
+        [[ "$break_after_one" == true ]] && _arg="${1:2}"
+        case "$_arg" in
+        y | yes) [[ -z "$arg_end" ]] && REM_AUTO_YES=1 || argv+=("$1") ;;
+        q | quiet) [[ -z "$arg_end" ]] && REM_QUIET=1 || argv+=("$1") ;;
+        n | no-color) [[ -z "$arg_end" ]] && _no_color || argv+=("$1") ;;
+        h) [[ -n "$CHECK" ]] && cmd="help" || argv+=("$1") ;;
+        H | help) [[ -n "$CHECK" ]] && cmd="HELP" || argv+=("$1") ;;
+        v) [[ -n "$CHECK" ]] && cmd="version" || argv+=("$1") ;;
+        V | version) [[ -n "$CHECK" ]] && cmd="VERSION" || argv+=("$1") ;;
+        *) [[ -n "$CHECK" ]] && _msg_ext "Unknown option: $1" $EOPTN || argv+=("$1") ;;
+        esac
+        [[ "$break_after_one" == true ]] && break
+      done
+      ;;
+    dl | del | delete) [[ -n "$CHECK" ]] && cmd="delete" || argv+=("$1") ;;
+    rm | rem | remove) [[ -n "$CHECK" ]] && cmd="remove" || argv+=("$1") ;;
+    rs | res | restore) [[ -n "$CHECK" ]] && cmd="restore" || argv+=("$1") ;;
+    rr | resear | research) [[ -n "$CHECK" ]] && cmd="research" || argv+=("$1") ;;
+    cl | clean) [[ -n "$CHECK" ]] && cmd="clean" || argv+=("$1") ;;
+    sr | search) [[ -n "$CHECK" ]] && cmd="search" || argv+=("$1") ;;
+    last | restore-last) [[ -n "$CHECK" ]] && cmd="last" || argv+=("$1") ;;
+    *) argv+=("$1") ;;
     esac
     shift
   done
